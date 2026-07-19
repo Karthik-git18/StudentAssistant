@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 
+# Environment variables
+.env
+
 # Database
 *.db
 
@@ -17,4 +20,6 @@ venv/
 
 # macOS
 .DS_Store
+
+# Local models
 models/
