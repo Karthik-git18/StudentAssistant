@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-title">Dashboard</div>
+
+<div class="split-layout">
+  <div style="flex: 1;">
+    <div class="grid grid-4">
+      <div class="card stat-card">
+        <div class="stat-card-content">
+          <div class="stat-info">
+            <div class="stat-label">Uploaded PDFs</div>
+            <div class="stat-value">{{ stats['uploads'] or 0 }}</div>
+          </div>
+          <div class="stat-icon"><i class="fas fa-file-pdf"></i></div>
+        </div>
+      </div>
+
+      <div class="card stat-card">
+        <div class="stat-card-content">
+          <div class="stat-info">
+            <div class="stat-label">Questions Asked</div>
+            <div class="stat-value">{{ stats['questions'] or 0 }}</div>
+          </div>
+          <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
+        </div>
+      </div>
+
+      <div class="card stat-card">
+        <div class="stat-card-content">
+          <div class="stat-info">
+            <div class="stat-label">Study Plans</div>
+            <div class="stat-value">{{ stats['plans'] or 0 }}</div>
+          </div>
+          <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+        </div>
+      </div>
+
+      <div class="card stat-card">
+        <div class="stat-card-content">
+          <div class="stat-info">
+            <div class="stat-label">Last Login</div>
+            <div class="stat-value" style="font-size: 16px;">{{ last_login or 'N/A' }}</div>
+          </div>
+          <div class="stat-icon"><i class="fas fa-clock"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 24px;">
+      <div class="card-header">
+        <div>
+          <h3>Weekly Activity</h3>
+          <p class="text-muted">Track your upload and study progress over the week.</p>
+        </div>
+      </div>
+      <canvas id="activityChart" style="max-height: 320px;"></canvas>
+    </div>
+
+    <div class="card" style="margin-top: 24px;">
+      <h3 style="margin-bottom: 16px;">Recent Activity</h3>
+      <div class="recent-list">
+        {% if recent_uploads or recent_chats %}
+          {% for upload in recent_uploads %}
+            <div class="recent-item">
+              <div><strong>Uploaded:</strong> {{ upload.filename }}</div>
+              <div class="recent-meta">{{ upload.created_at }} • {{ upload.pages }} pages</div>
+            </div>
+          {% endfor %}
+          {% for chat in recent_chats %}
+            <div class="recent-item">
+              <div><strong>QA:</strong> {{ chat.message[:60] }}{% if chat.message|length > 60 %}...{% endif %}</div>
+              <div class="recent-meta">{{ chat.created_at }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div style="padding: 20px; text-align: center; color: var(--muted);">
+            <i class="fas fa-inbox" style="font-size: 24px; margin-bottom: 8px; display: block;"></i>
+            No recent activity yet
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div style="width: min(360px, 100%);">
+    <div class="card sticky-card">
+      <h3>Quick Actions</h3>
+      <div class="quick-actions">
+        <a href="/learning" class="action-card">
+          <i class="fas fa-cloud-upload-alt"></i>
+          <div>
+            <h4>Upload PDF</h4>
+            <p>Index new documents instantly.</p>
+          </div>
+        </a>
+        <a href="/chat" class="action-card">
+          <i class="fas fa-robot"></i>
+          <div>
+            <h4>AI Chat</h4>
+            <p>Start a new conversation.</p>
+          </div>
+        </a>
+        <a href="/planner" class="action-card">
+          <i class="fas fa-calendar-plus"></i>
+          <div>
+            <h4>Study Planner</h4>
+            <p>Build a smart study schedule.</p>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const ctx = document.getElementById('activityChart');
+  if (ctx) {
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        datasets: [
+          {
+            label: 'PDF Uploads',
+            data: [3, 2, 1, 0, 1, 0, 0],
+            borderColor: 'rgba(79, 70, 229, 0.95)',
+            backgroundColor: 'rgba(79, 70, 229, 0.15)',
+            tension: 0.35,
+            fill: true,
+            pointRadius: 4,
+          },
+          {
+            label: 'Study Plans',
+            data: [0, 0, 1, 0, 1, 0, 0],
+            borderColor: 'rgba(16, 185, 129, 0.95)',
+            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+            tension: 0.35,
+            fill: true,
+            pointRadius: 4,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: { mode: 'index', intersect: false }
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, grid: { color: 'rgba(15, 23, 42, 0.08)' } }
+        }
+      }
+    });
+  }
+</script>
+{% endblock %}
+

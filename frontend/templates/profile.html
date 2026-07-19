@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-title">Profile</div>
+
+<div class="split-layout">
+  <!-- Profile Info -->
+  <div class="card">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #4F46E5, #7C3AED); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: 700; margin: 0 auto 16px;">
+        {{ user['name'][0] if user['name'] else 'U' }}
+      </div>
+      <h2 id="profileName" style="margin: 0 0 4px; font-family: 'Poppins', sans-serif; font-size: 20px; font-weight: 600;">{{ user['name'] or 'User' }}</h2>
+      <p id="profileRole" style="color: var(--muted); font-size: 13px;">Student</p>
+    </div>
+
+    <div style="space-y: 12px;">
+      <div class="profile-field">
+        <div class="profile-label">Email</div>
+        <div id="profileEmail" class="profile-value">{{ user['email'] or 'N/A' }}</div>
+      </div>
+
+      <div class="profile-field">
+        <div class="profile-label">Roll Number</div>
+        <div id="profileRoll" class="profile-value">{{ user['roll'] or 'N/A' }}</div>
+      </div>
+
+      <div class="profile-field">
+        <div class="profile-label">Branch</div>
+        <div id="profileBranch" class="profile-value">{{ user['branch'] or 'N/A' }}</div>
+      </div>
+
+      <div class="profile-field">
+        <div class="profile-label">Semester</div>
+        <div id="profileSemester" class="profile-value">{{ user['semester'] or 'N/A' }}</div>
+      </div>
+    </div>
+
+    <button id="editProfileButton" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 16px;">
+      <i class="fas fa-edit"></i> Edit Profile
+    </button>
+  </div>
+
+  <!-- Statistics -->
+  <div class="card">
+    <h3 style="margin-bottom: 20px; font-family: 'Poppins', sans-serif; font-size: 16px; font-weight: 600;">Statistics</h3>
+
+    <div class="stat-card stat-blue">
+      <div class="stat-label">QUESTIONS ASKED</div>
+      <div id="statQuestions" class="stat-value">{{ stats['questions'] or 0 }}</div>
+    </div>
+
+    <div class="stat-card stat-cyan">
+      <div class="stat-label">UPLOADED PDFs</div>
+      <div id="statUploads" class="stat-value">{{ stats['uploads'] or 0 }}</div>
+    </div>
+
+    <div class="stat-card stat-green">
+      <div class="stat-label">STUDY PLANS CREATED</div>
+      <div id="statPlans" class="stat-value">{{ stats['plans'] or 0 }}</div>
+    </div>
+  </div>
+</div>
+
+<div id="profileModal" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>Edit Profile</h3>
+      <button id="closeModal" class="modal-close"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="profileForm">
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input id="inputName" type="text" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input id="inputEmail" type="email" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Roll Number</label>
+        <input id="inputRoll" type="text" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Branch</label>
+        <input id="inputBranch" type="text" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Semester</label>
+        <input id="inputSemester" type="text" class="form-input">
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 18px;">
+        <button type="button" id="cancelProfile" class="btn btn-secondary" style="flex: 1; justify-content: center;">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center;">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const editProfileButton = document.getElementById('editProfileButton');
+const profileModal = document.getElementById('profileModal');
+const closeModal = document.getElementById('closeModal');
+const cancelProfile = document.getElementById('cancelProfile');
+const profileForm = document.getElementById('profileForm');
+
+function openProfileModal() {
+  document.getElementById('inputName').value = document.getElementById('profileName').textContent.trim();
+  document.getElementById('inputEmail').value = document.getElementById('profileEmail').textContent.trim();
+  document.getElementById('inputRoll').value = document.getElementById('profileRoll').textContent.trim() === 'N/A' ? '' : document.getElementById('profileRoll').textContent.trim();
+  document.getElementById('inputBranch').value = document.getElementById('profileBranch').textContent.trim() === 'N/A' ? '' : document.getElementById('profileBranch').textContent.trim();
+  document.getElementById('inputSemester').value = document.getElementById('profileSemester').textContent.trim() === 'N/A' ? '' : document.getElementById('profileSemester').textContent.trim();
+  profileModal.style.display = 'flex';
+}
+
+function closeProfileModal() {
+  profileModal.style.display = 'none';
+}
+
+editProfileButton.addEventListener('click', openProfileModal);
+closeModal.addEventListener('click', closeProfileModal);
+cancelProfile.addEventListener('click', closeProfileModal);
+profileModal.addEventListener('click', (event) => {
+  if (event.target === profileModal) {
+    closeProfileModal();
+  }
+});
+
+profileForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    name: document.getElementById('inputName').value.trim(),
+    email: document.getElementById('inputEmail').value.trim(),
+    roll: document.getElementById('inputRoll').value.trim(),
+    branch: document.getElementById('inputBranch').value.trim(),
+    semester: document.getElementById('inputSemester').value.trim(),
+  };
+
+  try {
+    const res = await fetch('/api/profile/update', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to update profile');
+    }
+    document.getElementById('profileName').textContent = data.user.name;
+    document.getElementById('profileEmail').textContent = data.user.email || 'N/A';
+    document.getElementById('profileRoll').textContent = data.user.roll || 'N/A';
+    document.getElementById('profileBranch').textContent = data.user.branch || 'N/A';
+    document.getElementById('profileSemester').textContent = data.user.semester || 'N/A';
+    closeProfileModal();
+    showNotification('Profile updated successfully', 'success');
+  } catch (error) {
+    showNotification(error.message, 'error');
+  }
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Assistant</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <i class="fas fa-brain"></i> Student AI
+        </div>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <div class="nav-group">
+          <div class="nav-group-title">Main</div>
+          <a href="/home" class="nav-item" data-page="home">
+            <i class="fas fa-home"></i> Dashboard
+          </a>
+          <a href="/learning" class="nav-item" data-page="learning">
+            <i class="fas fa-book"></i> Learning
+          </a>
+          <a href="/chat" class="nav-item" data-page="chat">
+            <i class="fas fa-robot"></i> AI Chat
+          </a>
+          <a href="/resume" class="nav-item" data-page="resume">
+            <i class="fas fa-file-alt"></i> Resume Builder
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">Account</div>
+          <a href="/profile" class="nav-item" data-page="profile">
+            <i class="fas fa-user"></i> Profile
+          </a>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a href="/logout" class="nav-item">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+      </div>
+    </aside>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+      <div class="navbar-left">
+        <div class="search-bar">
+          <i class="fas fa-search"></i>
+          <input type="text" placeholder="Search...">
+        </div>
+      </div>
+      
+      <div class="navbar-right">
+        <button class="navbar-icon">
+          <i class="fas fa-bell"></i>
+        </button>
+        <div class="user-avatar" onclick="alert('Profile')">{{ user_name[0] if user_name else 'U' }}</div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for cat, msg in messages %}
+              <div class="notification {{ 'success' if cat == 'success' else 'error' if cat == 'danger' else 'info' }}">
+                <i class="fas fa-{{ 'check-circle' if cat == 'success' else 'exclamation-circle' if cat == 'danger' else 'info-circle' }}"></i>
+                <span>{{ msg }}</span>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/main.js"></script>
+</body>
+</html>

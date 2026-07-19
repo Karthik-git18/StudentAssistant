@@ -1,0 +1,1290 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="learning-container">
+  <div class="page-header">
+    <h1 class="page-title">📚 Learning Assistant</h1>
+    <p class="page-subtitle">Upload PDFs and use AI to understand them better</p>
+  </div>
+
+  <div class="learning-grid">
+    <!-- Upload Section -->
+    <div class="upload-card glass-card">
+      <div class="card-header">
+        <i class="fas fa-cloud-upload-alt"></i>
+        <h2>Upload PDF</h2>
+      </div>
+      
+      <form id="uploadForm" enctype="multipart/form-data">
+        <div class="upload-dropzone" id="uploadArea">
+          <i class="fas fa-file-pdf"></i>
+          <h3>Drag & drop your PDF here</h3>
+          <p>or click to browse</p>
+          <input type="file" id="fileInput" name="file" accept="application/pdf" style="display: none;">
+        </div>
+        
+        <div id="uploadStatus" style="display: none;">
+          <div id="fileName" class="upload-filename"></div>
+          <div class="progress-container">
+            <div class="progress-bar">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <span id="progressText" class="progress-text">0%</span>
+          </div>
+          <button type="submit" class="btn btn-primary upload-btn" id="uploadBtn" disabled>
+            <i class="fas fa-check"></i> Upload PDF
+          </button>
+        </div>
+      </form>
+
+      <div id="uploadedDocs" class="upload-success" style="display: none;">
+        <i class="fas fa-check-circle"></i>
+        <div id="docsList"></div>
+      </div>
+
+      <div class="document-library" aria-live="polite">
+        <div class="library-heading">
+          <span><i class="fas fa-clock-rotate-left"></i> Recent Activity</span>
+          <span id="documentCount" class="document-count">0 documents</span>
+        </div>
+        <div id="documentList" class="document-list">
+          <div class="empty-documents">No documents uploaded yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs Section -->
+    <div class="tabs-section glass-card">
+      <div class="tabs-header">
+        <button class="tab-btn active" data-tab="ask" onclick="switchTab(this, 'ask')">
+          <i class="fas fa-question-circle"></i> Ask Questions
+        </button>
+        <button class="tab-btn" data-tab="summary" onclick="switchTab(this, 'summary')">
+          <i class="fas fa-file-alt"></i> Summary
+        </button>
+        <button class="tab-btn" data-tab="topics" onclick="switchTab(this, 'topics')">
+          <i class="fas fa-sparkles"></i> Topics
+        </button>
+      </div>
+
+      <!-- Tab 1: Ask Questions -->
+      <div class="tab-content active" id="ask-tab">
+        <div class="chat-container">
+          <div id="qaMessages" class="messages-box"></div>
+        </div>
+        <div class="input-composer">
+          <input id="qaQuestion" class="input-field" placeholder="Ask anything about your PDF...">
+          <button id="qaButton" class="btn btn-primary composer-btn">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab 2: Summary -->
+      <div class="tab-content" id="summary-tab">
+        <div class="tab-info">
+          <p>Generate a comprehensive summary of your PDF including overview, key points, and important concepts.</p>
+        </div>
+        <button id="generateSummaryBtn" class="btn btn-primary generate-btn">
+          <i class="fas fa-wand-magic-sparkles"></i> Generate Summary
+        </button>
+        
+        <div id="summaryOutput" class="summary-output" style="display: none;">
+          <div id="summaryText" class="summary-text"></div>
+          <button id="copySummaryBtn" class="btn btn-secondary copy-btn">
+            <i class="fas fa-copy"></i> Copy
+          </button>
+        </div>
+
+        <div id="summaryLoading" class="loading-state" style="display: none;">
+          <div class="spinner"></div>
+          <p>Generating summary...</p>
+        </div>
+      </div>
+
+      <!-- Tab 3: Topics -->
+      <div class="tab-content" id="topics-tab">
+        <div class="tab-info">
+          <p>Extract important topics and concepts from your PDF document.</p>
+        </div>
+        <button id="extractTopicsBtn" class="btn btn-primary generate-btn">
+          <i class="fas fa-lightbulb"></i> Extract Topics
+        </button>
+
+        <div id="topicsOutput" class="topics-output" style="display: none;">
+          <div id="topicsList" class="topics-grid"></div>
+        </div>
+
+        <div id="topicsLoading" class="loading-state" style="display: none;">
+          <div class="spinner"></div>
+          <p>Extracting topics...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="deleteDocumentModal" class="modal-overlay document-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="deleteDocumentTitle">
+  <div class="modal-card">
+    <div class="delete-modal-icon"><i class="fas fa-trash"></i></div>
+    <h2 id="deleteDocumentTitle">Delete this document permanently?</h2>
+    <p>The PDF, extracted text, embeddings, FAISS index, chunk cache, and metadata will be permanently removed.</p>
+    <div class="document-modal-actions">
+      <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+      <button type="button" id="confirmDeleteDocument" class="btn btn-danger"><i class="fas fa-trash"></i> Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const uploadForm = document.getElementById('uploadForm');
+const uploadStatus = document.getElementById('uploadStatus');
+const uploadedDocs = document.getElementById('uploadedDocs');
+const fileName = document.getElementById('fileName');
+const progressFill = document.getElementById('progressFill');
+const progressText = document.getElementById('progressText');
+const uploadBtn = document.getElementById('uploadBtn');
+
+function switchTab(btn, tabName) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+  document.getElementById(tabName + '-tab').classList.add('active');
+}
+
+function resetUploadState() {
+  uploadBtn.disabled = true;
+  uploadBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Upload PDF';
+  progressFill.style.width = '0%';
+  progressText.textContent = '0%';
+  fileName.textContent = '';
+  uploadStatus.style.display = 'none';
+  uploadArea.style.display = 'block';
+}
+
+function setUploadStateReady() {
+  uploadBtn.disabled = false;
+  uploadBtn.innerHTML = '<i class="fas fa-check"></i> Upload PDF';
+}
+
+function setUploadStateUploading() {
+  uploadBtn.disabled = true;
+  uploadBtn.innerHTML = '<span class="spinner"></span> Uploading...';
+}
+
+uploadArea.addEventListener('click', () => fileInput.click());
+
+uploadArea.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  uploadArea.classList.add('drag-over');
+});
+
+uploadArea.addEventListener('dragleave', () => {
+  uploadArea.classList.remove('drag-over');
+});
+
+uploadArea.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadArea.classList.remove('drag-over');
+  if (e.dataTransfer.files.length > 0) {
+    fileInput.files = e.dataTransfer.files;
+    onFileSelected();
+  }
+});
+
+fileInput.addEventListener('change', onFileSelected);
+
+function onFileSelected() {
+  const file = fileInput.files[0];
+  if (!file) return;
+  fileName.textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+  uploadStatus.style.display = 'block';
+  uploadArea.style.display = 'none';
+  setUploadStateReady();
+}
+
+uploadForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+  setUploadStateUploading();
+  progressFill.style.width = '5%';
+  progressText.textContent = '5%';
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/upload_pdf', true);
+  xhr.timeout = 120000;
+
+  xhr.upload.onprogress = (event) => {
+    if (event.lengthComputable) {
+      const percent = Math.max(5, Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      progressFill.style.width = percent + '%';
+      progressText.textContent = percent + '%';
+    }
+  };
+
+  xhr.onload = () => {
+    let payload = null;
+    try {
+      payload = JSON.parse(xhr.responseText);
+    } catch (err) {
+      console.error('Upload response parse failed', err);
+    }
+
+    if (xhr.status === 200 && payload && payload.success) {
+      progressFill.style.width = '100%';
+      progressText.textContent = '100%';
+      uploadedDocs.style.display = 'block';
+      uploadedDocs.innerHTML = `
+        <div class="success-message">
+          <i class="fas fa-check-circle"></i>
+          <div class="success-info">
+            <strong>${payload.filename}</strong>
+            <span class="success-details">${payload.pages} pages • ${(file.size / 1024 / 1024).toFixed(2)} MB</span>
+          </div>
+        </div>
+      `;
+      showNotification('PDF uploaded successfully!', 'success');
+      loadDocuments();
+      setTimeout(() => {
+        uploadForm.reset();
+        resetUploadState();
+      }, 2500);
+    } else {
+      const errorMsg = payload?.message || `Upload failed (${xhr.status})`;
+      showNotification(errorMsg, 'error');
+      setUploadStateReady();
+      progressFill.style.width = '0%';
+      progressText.textContent = '0%';
+    }
+  };
+
+  xhr.onerror = () => {
+    showNotification('Network error. Please try again.', 'error');
+    setUploadStateReady();
+  };
+
+  xhr.ontimeout = () => {
+    showNotification('Upload timed out. Please try again.', 'error');
+    setUploadStateReady();
+  };
+
+  xhr.send(formData);
+});
+
+let documentPendingDeletion = null;
+
+function escapeDocumentName(value) {
+  return escapeHtml(value || 'Untitled document');
+}
+
+async function loadDocuments() {
+  const list = document.getElementById('documentList');
+  try {
+    const response = await fetch('/api/documents');
+    const payload = await response.json();
+    const documents = payload.documents || [];
+    document.getElementById('documentCount').textContent = `${documents.length} document${documents.length === 1 ? '' : 's'}`;
+    if (!documents.length) {
+      list.innerHTML = '<div class="empty-documents">No documents uploaded yet.</div>';
+      return;
+    }
+    list.innerHTML = documents.map(doc => `
+      <div class="document-row" data-document-id="${doc.id}">
+        <div class="document-info"><i class="fas fa-file-pdf"></i><div><strong>${escapeDocumentName(doc.filename)}</strong><span>${doc.pages || 0} pages</span></div></div>
+        <div class="document-actions">
+          <a class="document-action view" href="/api/documents/${doc.id}/view" target="_blank" rel="noopener"><i class="fas fa-eye"></i> View</a>
+          <button class="document-action delete" type="button" onclick="openDeleteModal(${doc.id})"><i class="fas fa-trash"></i> Delete</button>
+        </div>
+      </div>`).join('');
+  } catch (error) {
+    list.innerHTML = '<div class="empty-documents">Could not load documents.</div>';
+  }
+}
+
+function openDeleteModal(id) {
+  documentPendingDeletion = id;
+  document.getElementById('deleteDocumentTitle').textContent = 'Delete this document permanently?';
+  document.getElementById('deleteDocumentModal').style.display = 'flex';
+}
+
+function closeDeleteModal() {
+  documentPendingDeletion = null;
+  document.getElementById('deleteDocumentModal').style.display = 'none';
+}
+
+document.getElementById('confirmDeleteDocument').addEventListener('click', async () => {
+  if (!documentPendingDeletion) return;
+  const button = document.getElementById('confirmDeleteDocument');
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner"></span> Deleting...';
+  try {
+    const response = await fetch(`/api/documents/${documentPendingDeletion}`, { method: 'DELETE' });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.error || 'Delete failed');
+    document.querySelector(`[data-document-id="${documentPendingDeletion}"]`)?.remove();
+    closeDeleteModal();
+    await loadDocuments();
+    showNotification('Document permanently deleted.', 'success');
+  } catch (error) {
+    showNotification(error.message || 'Could not delete document.', 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = '<i class="fas fa-trash"></i> Delete';
+  }
+});
+
+document.addEventListener('DOMContentLoaded', loadDocuments);
+
+document.getElementById('qaButton').onclick = async function() {
+  const q = document.getElementById('qaQuestion').value;
+  if (!q) return;
+  
+  const msgs = document.getElementById('qaMessages');
+  const um = document.createElement('div');
+  um.className = 'message user-message';
+  um.innerHTML = '<div class="message-bubble user">' + escapeHtml(q) + '</div>';
+  msgs.appendChild(um);
+  
+  document.getElementById('qaQuestion').value = '';
+  msgs.scrollTop = msgs.scrollHeight;
+  
+  try {
+    const res = await fetch('/api/qa', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question: q})
+    });
+    
+    const data = await res.json();
+    const bm = document.createElement('div');
+    bm.className = 'message bot-message';
+    const answer = data.answer || data.error || 'No response';
+    bm.innerHTML = '<div class="message-bubble bot">' + renderMarkdown(answer) + '</div>';
+    msgs.appendChild(bm);
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch (err) {
+    const bm = document.createElement('div');
+    bm.className = 'message bot-message';
+    bm.innerHTML = '<div class="message-bubble bot error">Error processing question</div>';
+    msgs.appendChild(bm);
+  }
+};
+
+document.getElementById('generateSummaryBtn').onclick = async function() {
+  const btn = this;
+  btn.disabled = true;
+  document.getElementById('summaryLoading').style.display = 'block';
+  document.getElementById('summaryOutput').style.display = 'none';
+  
+  try {
+    const res = await fetch('/api/extract-summary', {method: 'GET'});
+    const data = await res.json();
+    
+    if (data.success) {
+      const summaryText = document.getElementById('summaryText');
+      summaryText.innerHTML = renderSummaryCard(data.summary);
+      document.getElementById('summaryOutput').style.display = 'block';
+      showNotification('Summary generated!', 'success');
+    } else {
+      showNotification(data.error || 'Failed to generate summary', 'error');
+    }
+  } catch (err) {
+    showNotification('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('summaryLoading').style.display = 'none';
+  }
+};
+
+document.getElementById('copySummaryBtn').onclick = function() {
+  const text = document.getElementById('summaryText').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    showNotification('Copied to clipboard!', 'success');
+  }).catch(() => {
+    showNotification('Failed to copy', 'error');
+  });
+};
+
+document.getElementById('extractTopicsBtn').onclick = async function() {
+  const btn = this;
+  btn.disabled = true;
+  document.getElementById('topicsLoading').style.display = 'block';
+  document.getElementById('topicsOutput').style.display = 'none';
+  
+  try {
+    const res = await fetch('/api/extract-topics', {method: 'GET'});
+    const data = await res.json();
+    
+    if (data.success) {
+      const topicsList = document.getElementById('topicsList');
+      topicsList.innerHTML = '';
+      
+      const topics = data.topics || [];
+      if (topics.length === 0) {
+        const emptyMessage = document.createElement('div');
+        emptyMessage.style.gridColumn = '1 / -1';
+        emptyMessage.style.textAlign = 'center';
+        emptyMessage.style.padding = '2rem';
+        emptyMessage.style.color = '#888';
+        emptyMessage.innerHTML = '<h4><i class="fas fa-info-circle"></i> No topics found.</h4>';
+        topicsList.appendChild(emptyMessage);
+      } else {
+        topics.forEach((topic, index) => {
+          const topicCard = document.createElement('div');
+          topicCard.className = 'topic-card-enhanced';
+          topicCard.style.animationDelay = (index * 0.05) + 's';
+          
+          const title = topic.title || 'Untitled Topic';
+          const description = topic.description || 'No description available.';
+          
+          topicCard.innerHTML = `
+            <div class="topic-card-title">
+              <strong>📘 ${escapeHtml(title)}</strong>
+            </div>
+            <div class="topic-card-desc">${escapeHtml(description)}</div>
+          `;
+          topicsList.appendChild(topicCard);
+        });
+      }
+      
+      document.getElementById('topicsOutput').style.display = 'block';
+      showNotification('Topics extracted!', 'success');
+    } else {
+      showNotification(data.error || 'Failed to extract topics', 'error');
+    }
+  } catch (err) {
+    showNotification('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('topicsLoading').style.display = 'none';
+  }
+};
+
+function renderMarkdown(text) {
+  if (!text) return '';
+  
+  let html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  
+  // Replace bold: **text**
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  
+  // Replace italics: *text*
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  
+  const lines = html.split('\n');
+  let result = [];
+  let inList = false;
+  
+  for (let line of lines) {
+    const trimmed = line.trim();
+    const listMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+    
+    if (listMatch) {
+      if (!inList) {
+        result.push('<ol class="chat-markdown-list">');
+        inList = true;
+      }
+      result.push(`<li>${listMatch[2]}</li>`);
+    } else {
+      if (inList) {
+        result.push('</ol>');
+        inList = false;
+      }
+      if (trimmed) {
+        if (trimmed.startsWith('#')) {
+          const headerMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
+          if (headerMatch) {
+            const level = headerMatch[1].length;
+            result.push(`<h${level} class="chat-markdown-header">${headerMatch[2]}</h${level}>`);
+            continue;
+          }
+        }
+        result.push(`<p class="chat-markdown-para">${trimmed}</p>`);
+      }
+    }
+  }
+  
+  if (inList) {
+    result.push('</ol>');
+  }
+  
+  return result.join('');
+}
+
+function renderSummaryCard(summaryText) {
+  if (!summaryText) return '';
+  
+  if (summaryText.includes("No sufficient information found inside the uploaded PDF.")) {
+    return `
+      <div class="summary-card-enhanced" style="padding: 2rem; text-align: center; color: #888;">
+        <i class="fas fa-info-circle" style="font-size: 2rem; margin-bottom: 1rem; display: block;"></i>
+        <p>${escapeHtml(summaryText)}</p>
+      </div>
+    `;
+  }
+  
+  const formatText = (txt) => {
+    return escapeHtml(txt).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  };
+  
+  const lowerText = summaryText.toLowerCase();
+  
+  // Check if the response contains the new structured sections
+  if (lowerText.includes('overview') && lowerText.includes('key points')) {
+    const sections = {
+      'overview': '',
+      'key points': '',
+      'important concepts': '',
+      'conclusion': ''
+    };
+    
+    const lines = summaryText.split('\n');
+    let currentSection = null;
+    
+    for (let line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      
+      const lowerLine = trimmed.toLowerCase();
+      if (lowerLine.startsWith('overview')) {
+        currentSection = 'overview';
+      } else if (lowerLine.startsWith('key points')) {
+        currentSection = 'key points';
+      } else if (lowerLine.startsWith('important concepts')) {
+        currentSection = 'important concepts';
+      } else if (lowerLine.startsWith('conclusion')) {
+        currentSection = 'conclusion';
+      } else if (currentSection) {
+        sections[currentSection] += line + '\n';
+      }
+    }
+    
+    const formatSectionContent = (content) => {
+      if (!content.trim()) return '';
+      return content.split('\n')
+        .map(l => l.trim())
+        .filter(l => l)
+        .map(l => {
+          if (l.match(/^[\-\*•\d\.\)]+/)) {
+            return `<li>${formatText(l.replace(/^[\s\-\*•\d\.\)]+/, '').trim())}</li>`;
+          }
+          return `<p>${formatText(l)}</p>`;
+        })
+        .join('');
+    };
+    
+    let html = `
+      <div class="summary-card-enhanced">
+        <div class="summary-card-header">
+          <span>📄 Document Summary</span>
+        </div>
+        <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+    `;
+    
+    const sectionNames = {
+      'overview': 'Overview',
+      'key points': 'Key Points',
+      'important concepts': 'Important Concepts',
+      'conclusion': 'Conclusion'
+    };
+    
+    for (let key in sections) {
+      const content = sections[key];
+      if (content.trim()) {
+        const title = sectionNames[key];
+        const formatted = formatSectionContent(content);
+        html += `
+          <div class="summary-section">
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--primary-color, #4f46e5); font-size: 1.1rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.25rem; font-weight: 600;">${title}</h4>
+            <div style="font-size: 0.95rem; line-height: 1.5; color: var(--text-color, #374151);">
+              ${formatted.startsWith('<li>') ? `<ul style="margin: 0; padding-left: 1.2rem; list-style-type: disc;">${formatted}</ul>` : formatted}
+            </div>
+          </div>
+        `;
+      }
+    }
+    
+    html += `
+        </div>
+      </div>
+    `;
+    return html;
+  }
+  
+  // Fallback to legacy parser if it's the old style
+  const lines = summaryText.split('\n');
+  let bulletPoints = [];
+  let overallSummaryLines = [];
+  let inOverall = false;
+  
+  for (let line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    
+    if (trimmed.toLowerCase().includes('overall summary')) {
+      inOverall = true;
+      continue;
+    }
+    if (trimmed.toLowerCase().includes('document summary')) {
+      continue;
+    }
+    
+    if (inOverall) {
+      overallSummaryLines.push(trimmed);
+    } else {
+      const cleanPoint = trimmed.replace(/^[\s\-\*•\d\.\)]+/, '').trim();
+      if (cleanPoint) {
+        bulletPoints.push(cleanPoint);
+      }
+    }
+  }
+  
+  let html = `
+    <div class="summary-card-enhanced">
+      <div class="summary-card-header">
+        <span>📄 Document Summary</span>
+      </div>
+      <ul class="summary-bullets">
+        ${bulletPoints.map(pt => `<li>${formatText(pt)}</li>`).join('')}
+      </ul>
+      <div class="summary-divider"></div>
+      <div class="overall-summary-section">
+        <h3>Overall Summary</h3>
+        <p>${formatText(overallSummaryLines.join(' '))}</p>
+      </div>
+    </div>
+  `;
+  return html;
+}
+
+function escapeHtml(txt) {
+  const div = document.createElement('div');
+  div.textContent = txt;
+  return div.innerHTML;
+}
+
+function showNotification(msg, type) {
+  const n = document.createElement('div');
+  n.className = 'notification ' + type;
+  n.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-circle') + '"></i> ' + msg;
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 3500);
+}
+</script>
+
+<style>
+.learning-container {
+  padding: 40px 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.page-title {
+  font-size: 36px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 8px;
+}
+
+.page-subtitle {
+  font-size: 16px;
+  color: #6B7280;
+  margin: 0;
+}
+
+.learning-grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  box-shadow: 0 12px 48px rgba(15, 23, 42, 0.12);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.card-header i {
+  font-size: 24px;
+  color: #2563EB;
+}
+
+.card-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.upload-dropzone {
+  border: 2px dashed #D1D5DB;
+  border-radius: 16px;
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: rgba(37, 99, 235, 0.02);
+}
+
+.upload-dropzone:hover {
+  border-color: #2563EB;
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.upload-dropzone.drag-over {
+  border-color: #2563EB;
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.upload-dropzone i {
+  font-size: 42px;
+  color: #2563EB;
+  margin-bottom: 12px;
+}
+
+.upload-dropzone h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  margin: 12px 0 6px;
+}
+
+.upload-dropzone p {
+  font-size: 13px;
+  color: #6B7280;
+  margin: 0;
+}
+
+.progress-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 6px;
+  background: #E5E7EB;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563EB, #4F46E5);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6B7280;
+  min-width: 35px;
+}
+
+.upload-filename {
+  font-size: 13px;
+  color: #111827;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.upload-btn {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.upload-success {
+  background: rgba(22, 163, 74, 0.08);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.success-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #16A34A;
+}
+
+.success-message i {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.success-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.success-details {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.tabs-header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #E5E7EB;
+  padding-bottom: 0;
+}
+
+.tab-btn {
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #6B7280;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab-btn:hover {
+  color: #111827;
+}
+
+.tab-btn.active {
+  color: #2563EB;
+  border-bottom-color: #2563EB;
+}
+
+.tab-content {
+  display: none;
+  animation: fadeIn 0.3s;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tab-info {
+  background: rgba(37, 99, 235, 0.06);
+  border-left: 4px solid #2563EB;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.tab-info p {
+  margin: 0;
+  font-size: 13px;
+  color: #4B5563;
+}
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 400px;
+  margin-bottom: 16px;
+}
+
+.messages-box {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.message {
+  display: flex;
+  margin-bottom: 4px;
+}
+
+.user-message {
+  justify-content: flex-end;
+}
+
+.message-bubble {
+  max-width: 75%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  word-wrap: break-word;
+  line-height: 1.5;
+}
+
+.message-bubble.user {
+  background: linear-gradient(135deg, #2563EB, #4F46E5);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.message-bubble.bot {
+  background: #FFFFFF;
+  color: #111827;
+  border: 1px solid #E5E7EB;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  padding: 16px 20px;
+}
+
+.chat-markdown-list {
+  margin: 8px 0 8px 24px;
+  padding: 0;
+}
+
+.chat-markdown-list li {
+  margin-bottom: 8px;
+  line-height: 1.6;
+  font-size: 14px;
+  color: #374151;
+}
+
+.chat-markdown-para {
+  margin-bottom: 12px;
+  line-height: 1.6;
+  font-size: 14px;
+  color: #374151;
+}
+
+.chat-markdown-para:last-child {
+  margin-bottom: 0;
+}
+
+.chat-markdown-header {
+  font-weight: 700;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  color: #111827;
+}
+
+.message-bubble.bot strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+.message-bubble.bot.error {
+  background: #FEE2E2;
+  color: #DC2626;
+  border-color: #FCA5A5;
+}
+
+.input-composer {
+  display: flex;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.input-field {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid #D1D5DB;
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #F9FAFB;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.composer-btn {
+  padding: 12px 20px;
+  border-radius: 12px;
+}
+
+.generate-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 15px;
+}
+
+.summary-output {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  margin-top: 16px;
+}
+
+.summary-card-enhanced {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.025);
+  margin-bottom: 16px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.summary-card-enhanced:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.summary-card-header {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+
+.summary-bullets {
+  list-style-type: disc;
+  padding-left: 24px;
+  margin-bottom: 20px;
+}
+
+.summary-bullets li {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4b5563;
+  margin-bottom: 10px;
+}
+
+.summary-bullets li strong {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.summary-divider {
+  height: 1px;
+  background-color: #f1f5f9;
+  margin: 20px 0;
+}
+
+.overall-summary-section h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.overall-summary-section p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4b5563;
+  margin: 0;
+}
+
+.overall-summary-section p strong {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.copy-btn {
+  width: 100%;
+  margin-top: 0;
+}
+
+.topics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.topic-card-enhanced {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.025);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+  animation: slideUp 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+.topic-card-enhanced:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 20px -3px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.03);
+  border-color: #2563EB;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.topic-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topic-card-desc {
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  background: rgba(37, 99, 235, 0.05);
+  border-radius: 12px;
+  gap: 12px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #E5E7EB;
+  border-top-color: #2563EB;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.notification {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  color: white;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 9999;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification.success { background: #16A34A; }
+.notification.error { background: #DC2626; }
+
+.document-library { margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+.library-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #1f2937; font-weight: 700; margin-bottom: 12px; }
+.library-heading i { color: #6366f1; }
+.document-count { font-size: 11px; color: #64748b; font-weight: 600; }
+.document-list { display: grid; gap: 10px; max-height: 280px; overflow-y: auto; }
+.document-row { padding: 12px; border: 1px solid #e2e8f0; background: rgba(248,250,252,.75); border-radius: 14px; }
+.document-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.document-info > i { color: #dc2626; font-size: 20px; }
+.document-info strong, .document-info span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-info strong { color: #1e293b; font-size: 12px; }
+.document-info span, .empty-documents { color: #64748b; font-size: 11px; }
+.document-actions { display: flex; gap: 8px; margin-top: 10px; }
+.document-action { border: 0; border-radius: 9px; padding: 7px 9px; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; text-decoration: none; transition: transform .2s, box-shadow .2s; }
+.document-action:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(15,23,42,.12); }
+.document-action.view { color: #1d4ed8; background: #dbeafe; }
+.document-action.delete { color: #b91c1c; background: #fee2e2; }
+.document-modal .modal-card { text-align: center; background: #fff; }
+.delete-modal-icon { width: 52px; height: 52px; display: grid; place-items: center; margin: 0 auto 14px; border-radius: 50%; color: #dc2626; background: #fee2e2; }
+.document-modal h2 { color: #0f172a; font-size: 20px; margin-bottom: 8px; }
+.document-modal p { color: #64748b; margin-bottom: 22px; }
+.document-modal-actions { display: flex; justify-content: center; gap: 12px; }
+.btn-danger { background: #dc2626; color: #fff; border: 0; }
+.btn-danger:hover { background: #b91c1c; }
+
+@media (max-width: 1024px) {
+  .learning-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .learning-container {
+    padding: 24px 16px;
+  }
+
+  .page-title {
+    font-size: 28px;
+  }
+
+  .tabs-header {
+    gap: 4px;
+  }
+
+  .tab-btn {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .chat-container {
+    height: 300px;
+  }
+
+  .message-bubble {
+    max-width: 90%;
+  }
+
+  .topics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+{% endblock %}

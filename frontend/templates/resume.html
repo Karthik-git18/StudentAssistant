@@ -1,0 +1,1152 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="page-header">
+  <div class="title-section">
+    <h1 class="page-title"><i class="fas fa-file-invoice-alt"></i> AI Resume Builder</h1>
+    <p class="page-subtitle">Create an ATS-optimized, recruiter-ready resume using offline Generative AI</p>
+  </div>
+</div>
+
+<div class="resume-workspace">
+  <!-- ========== FORM SIDE (LEFT) ========== -->
+  <div class="form-side">
+    <form id="resumeForm" onsubmit="event.preventDefault();">
+
+      <!-- 1. Personal Information -->
+      <div class="accordion-card">
+        <div class="accordion-header active" onclick="toggleAccordion(this)" role="button" tabindex="0" aria-expanded="true">
+          <div class="header-title"><i class="fas fa-user-circle"></i><span>Personal Information</span></div>
+          <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="accordion-content open">
+          <div class="form-row">
+            <div class="form-group"><label for="name">Full Name *</label><input type="text" id="name"
+                class="form-control" placeholder="e.g. Karthik Palepu" required></div>
+            <div class="form-group"><label for="title">Professional Title *</label><input type="text" id="title"
+                class="form-control" placeholder="e.g. AI & ML Engineer" required></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label for="email">Email *</label><input type="email" id="email"
+                class="form-control" placeholder="e.g. karthik@example.com" required></div>
+            <div class="form-group"><label for="phone">Phone</label><input type="tel" id="phone" class="form-control"
+                placeholder="e.g. +91 98765 43210"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label for="linkedin">LinkedIn URL</label><input type="url" id="linkedin"
+                class="form-control" placeholder="e.g. linkedin.com/in/username"></div>
+            <div class="form-group"><label for="github">GitHub URL</label><input type="url" id="github"
+                class="form-control" placeholder="e.g. github.com/username"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Professional Summary -->
+      <div class="accordion-card">
+        <div class="accordion-header" onclick="toggleAccordion(this)" role="button" tabindex="0" aria-expanded="false">
+          <div class="header-title"><i class="fas fa-align-left"></i><span>Professional Summary</span></div>
+          <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="accordion-content">
+          <div class="form-group">
+            <label for="professional_summary">Summary</label>
+            <textarea id="professional_summary" class="form-control" rows="4"
+              placeholder="Write a brief professional summary or click Generate with AI..."></textarea>
+          </div>
+          <button type="button" class="btn-ai" onclick="generateSummary()"><i class="fas fa-magic"></i> Generate with
+            AI</button>
+        </div>
+      </div>
+
+      <!-- 3. Education (Repeater) -->
+      <div class="accordion-card">
+        <div class="accordion-header" onclick="toggleAccordion(this)" role="button" tabindex="0" aria-expanded="false">
+          <div class="header-title"><i class="fas fa-graduation-cap"></i><span>Education</span></div>
+          <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="accordion-content">
+          <div id="education-list"></div>
+          <button type="button" class="btn-add" onclick="addEducation()"><i class="fas fa-plus"></i> Add
+            Education</button>
+        </div>
+      </div>
+
+      <!-- 4. Technical Skills -->
+      <div class="accordion-card">
+        <div class="accordion-header" onclick="toggleAccordion(this)" role="button" tabindex="0" aria-expanded="false">
+          <div class="header-title"><i class="fas fa-code"></i><span>Technical Skills</span></div>
+          <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="accordion-content">
+          <div class="form-group">
+            <label for="skills">Skills (comma-separated)</label>
+            <textarea id="skills" class="form-control" rows="3"
+              placeholder="e.g. Python, Flask, JavaScript, Machine Learning, TensorFlow, SQL, Git"></textarea>
+            <small class="form-hint">Separate skills with commas. AI will NOT generate skills — enter your own.</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Experience (Repeater) -->
+      <div class="accordion-card">
+        <div class="accordion-header" onclick="toggleAccordion(this)" role="button" tabindex="0" aria-expanded="false">
+          <div class="header-title"><i class="fas fa-briefcase"></i><span>Experience</span></div>
+          <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="accordion-content">
+          <div id="experience-list"></div>
+          <button type="button" class="btn-add" onclick="addExperience()"><i class="fas fa-plus"></i> Add
+            Experience</button>
+        </div>
+      </div>
+
+      <!-- 6. Projects (Repeater) -->
+      <div class="accordion-card">
+        <div class="accordion-header" onclick="toggleAccordion(this)" role="button" tabindex="0" aria-expanded="false">
+          <div class="header-title"><i class="fas fa-project-diagram"></i><span>Projects</span></div>
+          <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="accordion-content">
+          <div id="projects-list"></div>
+          <button type="button" class="btn-add" onclick="addProject()"><i class="fas fa-plus"></i> Add Project</button>
+        </div>
+      </div>
+
+      <!-- 7. Certifications (Repeater) -->
+      <div class="accordion-card">
+        <div class="accordion-header" onclick="toggleAccordion(this)" role="button" tabindex="0" aria-expanded="false">
+          <div class="header-title"><i class="fas fa-certificate"></i><span>Certifications</span></div>
+          <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="accordion-content">
+          <div id="certifications-list"></div>
+          <button type="button" class="btn-add" onclick="addCertification()"><i class="fas fa-plus"></i> Add
+            Certification</button>
+        </div>
+      </div>
+
+      <!-- 8. Languages -->
+      <div class="accordion-card">
+        <div class="accordion-header" onclick="toggleAccordion(this)" role="button" tabindex="0" aria-expanded="false">
+          <div class="header-title"><i class="fas fa-language"></i><span>Languages</span></div>
+          <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="accordion-content">
+          <div class="form-group">
+            <label for="languages">Languages</label>
+            <input type="text" id="languages" class="form-control" placeholder="e.g. English, Hindi, Telugu">
+          </div>
+        </div>
+      </div>
+
+      <!-- 9. Activities & Achievements -->
+      <div class="accordion-card">
+        <div class="accordion-header" onclick="toggleAccordion(this)" role="button" tabindex="0" aria-expanded="false">
+          <div class="header-title"><i class="fas fa-trophy"></i><span>Activities & Achievements</span></div>
+          <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="accordion-content">
+          <div class="form-group">
+            <label for="activities">Activities (one per line)</label>
+            <textarea id="activities" class="form-control" rows="3"
+              placeholder="e.g.&#10;Member of IEEE Student Branch&#10;Won coding competition at college fest"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="action-bar">
+        <button type="button" class="btn-primary" onclick="generateResume()"><i class="fas fa-file-alt"></i> Generate
+          Resume</button>
+        <button type="button" class="btn-optimize" onclick="optimizeResume()"><i class="fas fa-robot"></i> Optimize
+          Resume with AI</button>
+        <button type="button" class="btn-secondary" onclick="downloadPDF()"><i class="fas fa-download"></i> Download
+          PDF</button>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- ========== PREVIEW SIDE (RIGHT) ========== -->
+  <div class="preview-side">
+    <div class="preview-header">
+      <h3><i class="fas fa-eye"></i> Resume Preview</h3>
+    </div>
+    <div class="preview-container" id="resumePreview">
+      <div class="empty-preview">
+        <i class="fas fa-file-alt"></i>
+        <p>Fill in your details and click <strong>Generate Resume</strong> to preview</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-box">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">AI is working...</p>
+  </div>
+</div>
+
+<style>
+  /* ===== RESUME WORKSPACE ===== */
+  .resume-workspace {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    padding: 0 20px 40px;
+    max-width: 1500px;
+    margin: 0 auto;
+    align-items: start;
+  }
+
+  .resume-workspace, .resume-workspace button, .resume-workspace input, .resume-workspace textarea {
+    font-family: 'Inter', sans-serif;
+  }
+
+  .form-side {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* ===== ACCORDION CARDS ===== */
+  .accordion-card {
+    background: #ffffff;
+    border: 1px solid #dbe3ef;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .accordion-card:hover {
+    border-color: #a78bfa;
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.08);
+  }
+
+  .accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .accordion-header:hover {
+    background: #f5f3ff;
+  }
+
+  .accordion-header .header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #172033;
+  }
+
+  .accordion-header .header-title i {
+    color: #6d28d9;
+    width: 18px;
+    text-align: center;
+  }
+
+  .accordion-header .chevron {
+    transition: transform 0.3s;
+    color: #52637a;
+    font-size: 0.75rem;
+  }
+
+  .accordion-header.active .chevron {
+    transform: rotate(180deg);
+  }
+
+  .accordion-header:focus-visible {
+    outline: 3px solid rgba(79, 70, 229, 0.28);
+    outline-offset: -3px;
+  }
+
+  .accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease, padding 0.3s;
+    padding: 0 20px;
+  }
+
+  .accordion-content.open {
+    max-height: 2000px;
+    padding: 0 20px 20px;
+  }
+
+  /* ===== FORM ELEMENTS ===== */
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 12px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .form-group label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .form-control {
+    background: #ffffff;
+    border: 1px solid #b7c3d4;
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #172033;
+    font-size: 0.88rem;
+    font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .form-control:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+    background: #fdfdff;
+  }
+
+  .form-control::placeholder {
+    color: #64748b;
+    opacity: 1;
+  }
+
+  textarea.form-control {
+    resize: vertical;
+    min-height: 60px;
+  }
+
+  .form-hint {
+    font-size: 0.72rem;
+    color: #52637a;
+    margin-top: 2px;
+  }
+
+  /* ===== REPEATER ITEMS ===== */
+  .repeater-item {
+    background: #f8fafc;
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
+    position: relative;
+  }
+
+  .repeater-item .remove-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(239, 68, 68, 0.15);
+    border: none;
+    color: #f87171;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .repeater-item .remove-btn:hover {
+    background: rgba(239, 68, 68, 0.3);
+  }
+
+  /* ===== BUTTONS ===== */
+  .btn-ai {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: all 0.25s;
+    margin-top: 6px;
+  }
+
+  .btn-ai:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.35);
+  }
+
+  .btn-ai:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-add {
+    background: #f5f3ff;
+    color: #5b21b6;
+    border: 1px dashed #8b5cf6;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: all 0.25s;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn-add:hover {
+    background: #ede9fe;
+    border-color: #6d28d9;
+  }
+
+  /* ===== ACTION BAR ===== */
+  .action-bar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 13px 28px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+    flex: 1;
+    justify-content: center;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(124, 58, 237, 0.4);
+  }
+
+  .btn-optimize {
+    background: linear-gradient(135deg, #059669, #10b981);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 13px 28px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+    flex: 1;
+    justify-content: center;
+  }
+
+  .btn-optimize:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(16, 185, 129, 0.35);
+  }
+
+  .btn-secondary {
+    background: #ffffff;
+    color: #334155;
+    border: 1px solid #94a3b8;
+    border-radius: 10px;
+    padding: 13px 28px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.25s;
+    flex: 1;
+    justify-content: center;
+  }
+
+  .btn-secondary:hover {
+    background: #f1f5f9;
+    border-color: #64748b;
+  }
+
+  /* ===== PREVIEW SIDE ===== */
+  .preview-side {
+    position: sticky;
+    top: 24px;
+    background: #ffffff;
+    border: 1px solid #dbe3ef;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .preview-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .preview-header h3 {
+    margin: 0;
+    font-size: 0.92rem;
+    color: #5b21b6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .preview-container {
+    padding: 20px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  .empty-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    color: #52637a;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .empty-preview i {
+    font-size: 3rem;
+    opacity: 0.3;
+  }
+
+  .empty-preview p {
+    font-size: 0.88rem;
+  }
+
+  /* ===== RESUME PAPER (Preview + Print) ===== */
+  .resume-paper {
+    background: #fff;
+    color: #1a1a2e;
+    padding: 40px 45px;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 10.5pt;
+    line-height: 1.5;
+    border-radius: 4px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .resume-paper .resume-header {
+    text-align: center;
+    border-bottom: 2px solid #1a1a2e;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+
+  .resume-paper .resume-header h1 {
+    font-size: 20pt;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: #1a1a2e;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  .resume-paper .resume-title {
+    font-size: 11pt;
+    color: #444;
+    margin-bottom: 6px;
+    font-style: italic;
+  }
+
+  .resume-paper .resume-contact {
+    font-size: 9pt;
+    color: #555;
+  }
+
+  .resume-paper .resume-contact a {
+    color: #2563eb;
+    text-decoration: none;
+  }
+
+  .resume-paper .resume-section {
+    margin-bottom: 14px;
+  }
+
+  .resume-paper .resume-section h2 {
+    font-size: 12pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #1a1a2e;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 3px;
+    margin: 0 0 8px;
+    letter-spacing: 1px;
+  }
+
+  .resume-paper .resume-item {
+    margin-bottom: 8px;
+  }
+
+  .resume-paper .resume-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .resume-paper .resume-item-title {
+    font-size: 10.5pt;
+  }
+
+  .resume-paper .resume-item-subtitle {
+    color: #555;
+    font-style: italic;
+    font-size: 9.5pt;
+  }
+
+  .resume-paper .resume-item-date {
+    font-size: 9pt;
+    color: #666;
+    white-space: nowrap;
+    font-style: italic;
+  }
+
+  .resume-paper .resume-item-details {
+    font-size: 9.5pt;
+    color: #333;
+    margin: 3px 0 0;
+  }
+
+  .resume-paper .resume-list {
+    margin: 4px 0 0 18px;
+    padding: 0;
+    font-size: 9.5pt;
+    color: #333;
+  }
+
+  .resume-paper .resume-list li {
+    margin-bottom: 2px;
+  }
+
+  /* ===== LOADING OVERLAY ===== */
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .loading-overlay.active {
+    display: flex;
+  }
+
+  .loading-box {
+    background: rgba(30, 30, 50, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 36px 48px;
+    text-align: center;
+  }
+
+  .loading-spinner {
+    width: 42px;
+    height: 42px;
+    border: 3px solid rgba(167, 139, 250, 0.2);
+    border-top-color: #a78bfa;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .loading-text {
+    color: #cbd5e1;
+    font-size: 0.92rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  /* ===== TOAST ===== */
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    padding: 14px 22px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    z-index: 10000;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.35s;
+    max-width: 350px;
+  }
+
+  .toast.show {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  .toast.success {
+    background: rgba(16, 185, 129, 0.9);
+    color: #fff;
+  }
+
+  .toast.error {
+    background: rgba(239, 68, 68, 0.9);
+    color: #fff;
+  }
+
+  /* ===== PRINT STYLES ===== */
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+
+    .resume-paper,
+    .resume-paper * {
+      visibility: visible;
+    }
+
+    .resume-paper {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      margin: 0;
+      padding: 36px 42px;
+      box-shadow: none;
+      border-radius: 0;
+      font-size: 10.5pt;
+    }
+
+    @page {
+      margin: 0.4in;
+      size: A4;
+    }
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 1024px) {
+    .resume-workspace {
+      grid-template-columns: 1fr;
+    }
+
+    .preview-side {
+      position: static;
+    }
+
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script>
+  // ===== ACCORDION =====
+  function toggleAccordion(header) {
+    const content = header.nextElementSibling;
+    const isOpen = header.classList.contains('active');
+    header.classList.toggle('active');
+    content.classList.toggle('open');
+    header.setAttribute('aria-expanded', String(!isOpen));
+  }
+
+  document.querySelectorAll('.accordion-header').forEach((header) => {
+    header.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleAccordion(header);
+      }
+    });
+  });
+
+  // ===== TOAST =====
+  function showToast(msg, type = 'success') {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 3000);
+  }
+
+  // ===== LOADING =====
+  function showLoading(msg) {
+    const overlay = document.getElementById('loadingOverlay');
+    overlay.querySelector('.loading-text').textContent = msg || 'AI is working...';
+    overlay.classList.add('active');
+  }
+  function hideLoading() {
+    document.getElementById('loadingOverlay').classList.remove('active');
+  }
+
+  // ===== EDUCATION REPEATER =====
+  let eduCount = 0;
+  function addEducation() {
+    eduCount++;
+    const id = eduCount;
+    const html = `
+  <div class="repeater-item" id="edu-${id}">
+    <button type="button" class="remove-btn" onclick="document.getElementById('edu-${id}').remove()"><i class="fas fa-times"></i></button>
+    <div class="form-row">
+      <div class="form-group"><label>College *</label><input type="text" class="form-control edu-college" placeholder="e.g. GITAM University"></div>
+      <div class="form-group"><label>Degree *</label><input type="text" class="form-control edu-degree" placeholder="e.g. B.Tech"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Branch</label><input type="text" class="form-control edu-branch" placeholder="e.g. Computer Science"></div>
+      <div class="form-group"><label>CGPA</label><input type="text" class="form-control edu-cgpa" placeholder="e.g. 8.5"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Graduation Year</label><input type="text" class="form-control edu-year" placeholder="e.g. 2026"></div>
+      <div class="form-group"></div>
+    </div>
+  </div>`;
+    document.getElementById('education-list').insertAdjacentHTML('beforeend', html);
+  }
+
+  // ===== EXPERIENCE REPEATER =====
+  let expCount = 0;
+  function addExperience() {
+    expCount++;
+    const id = expCount;
+    const html = `
+  <div class="repeater-item" id="exp-${id}">
+    <button type="button" class="remove-btn" onclick="document.getElementById('exp-${id}').remove()"><i class="fas fa-times"></i></button>
+    <div class="form-row">
+      <div class="form-group"><label>Company *</label><input type="text" class="form-control exp-company" placeholder="e.g. Google"></div>
+      <div class="form-group"><label>Role *</label><input type="text" class="form-control exp-role" placeholder="e.g. ML Intern"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Duration</label><input type="text" class="form-control exp-duration" placeholder="e.g. Jun 2025 - Aug 2025"></div>
+      <div class="form-group"></div>
+    </div>
+    <div class="form-group">
+      <label>Responsibilities / Work Notes</label>
+      <textarea class="form-control exp-responsibilities" rows="3" placeholder="Briefly describe what you did..."></textarea>
+    </div>
+    <button type="button" class="btn-ai" onclick="rewriteExperience(${id})"><i class="fas fa-magic"></i> Rewrite with AI</button>
+  </div>`;
+    document.getElementById('experience-list').insertAdjacentHTML('beforeend', html);
+  }
+
+  // ===== PROJECT REPEATER =====
+  let projCount = 0;
+  function addProject() {
+    projCount++;
+    const id = projCount;
+    const html = `
+  <div class="repeater-item" id="proj-${id}">
+    <button type="button" class="remove-btn" onclick="document.getElementById('proj-${id}').remove()"><i class="fas fa-times"></i></button>
+    <div class="form-row">
+      <div class="form-group"><label>Project Name *</label><input type="text" class="form-control proj-name" placeholder="e.g. Student Assistant"></div>
+      <div class="form-group"><label>Technologies</label><input type="text" class="form-control proj-tech" placeholder="e.g. Python, Flask, FAISS"></div>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea class="form-control proj-desc" rows="3" placeholder="Briefly describe the project..."></textarea>
+    </div>
+    <button type="button" class="btn-ai" onclick="improveProject(${id})"><i class="fas fa-magic"></i> Improve with AI</button>
+  </div>`;
+    document.getElementById('projects-list').insertAdjacentHTML('beforeend', html);
+  }
+
+  // ===== CERTIFICATION REPEATER =====
+  let certCount = 0;
+  function addCertification() {
+    certCount++;
+    const id = certCount;
+    const html = `
+  <div class="repeater-item" id="cert-${id}">
+    <button type="button" class="remove-btn" onclick="document.getElementById('cert-${id}').remove()"><i class="fas fa-times"></i></button>
+    <div class="form-row">
+      <div class="form-group"><label>Certification Name *</label><input type="text" class="form-control cert-name" placeholder="e.g. AWS Solutions Architect"></div>
+      <div class="form-group"><label>Issuer</label><input type="text" class="form-control cert-issuer" placeholder="e.g. Amazon"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Date</label><input type="text" class="form-control cert-date" placeholder="e.g. Dec 2024"></div>
+      <div class="form-group"></div>
+    </div>
+  </div>`;
+    document.getElementById('certifications-list').insertAdjacentHTML('beforeend', html);
+  }
+
+  // ===== COLLECT ALL FORM DATA =====
+  function collectResumeData() {
+    const data = {
+      name: document.getElementById('name').value.trim(),
+      title: document.getElementById('title').value.trim(),
+      email: document.getElementById('email').value.trim(),
+      phone: document.getElementById('phone').value.trim(),
+      linkedin: document.getElementById('linkedin').value.trim(),
+      github: document.getElementById('github').value.trim(),
+      professional_summary: document.getElementById('professional_summary').value.trim(),
+      skills: document.getElementById('skills').value.trim(),
+      languages: document.getElementById('languages').value.trim(),
+      activities: document.getElementById('activities').value.trim(),
+      education: [],
+      experience: [],
+      projects: [],
+      certifications: []
+    };
+
+    // Education
+    document.querySelectorAll('#education-list .repeater-item').forEach(item => {
+      data.education.push({
+        college: item.querySelector('.edu-college').value.trim(),
+        degree: item.querySelector('.edu-degree').value.trim(),
+        branch: item.querySelector('.edu-branch').value.trim(),
+        cgpa: item.querySelector('.edu-cgpa').value.trim(),
+        graduation_year: item.querySelector('.edu-year').value.trim()
+      });
+    });
+
+    // Experience
+    document.querySelectorAll('#experience-list .repeater-item').forEach(item => {
+      data.experience.push({
+        company: item.querySelector('.exp-company').value.trim(),
+        role: item.querySelector('.exp-role').value.trim(),
+        duration: item.querySelector('.exp-duration').value.trim(),
+        responsibilities: item.querySelector('.exp-responsibilities').value.trim()
+      });
+    });
+
+    // Projects
+    document.querySelectorAll('#projects-list .repeater-item').forEach(item => {
+      data.projects.push({
+        name: item.querySelector('.proj-name').value.trim(),
+        technologies: item.querySelector('.proj-tech').value.trim(),
+        description: item.querySelector('.proj-desc').value.trim()
+      });
+    });
+
+    // Certifications
+    document.querySelectorAll('#certifications-list .repeater-item').forEach(item => {
+      data.certifications.push({
+        name: item.querySelector('.cert-name').value.trim(),
+        issuer: item.querySelector('.cert-issuer').value.trim(),
+        date: item.querySelector('.cert-date').value.trim()
+      });
+    });
+
+    return data;
+  }
+
+  // ===== AI: GENERATE SUMMARY =====
+  async function generateSummary() {
+    const data = collectResumeData();
+    if (!data.name && !data.skills && data.education.length === 0) {
+      showToast('Please fill in some details first.', 'error');
+      return;
+    }
+    showLoading('Generating Professional Summary...');
+    try {
+      const resp = await fetch('/api/generate-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resume_data: data })
+      });
+      const result = await resp.json();
+      if (result.success) {
+        document.getElementById('professional_summary').value = result.summary;
+        showToast('Summary generated successfully!');
+      } else {
+        showToast(result.error || 'Failed to generate summary.', 'error');
+      }
+    } catch (e) {
+      showToast('Network error: ' + e.message, 'error');
+    }
+    hideLoading();
+  }
+
+  // ===== AI: REWRITE EXPERIENCE =====
+  async function rewriteExperience(id) {
+    const item = document.getElementById('exp-' + id);
+    if (!item) return;
+    const company = item.querySelector('.exp-company').value.trim();
+    const role = item.querySelector('.exp-role').value.trim();
+    const responsibilities = item.querySelector('.exp-responsibilities').value.trim();
+    if (!responsibilities) {
+      showToast('Please enter responsibilities first.', 'error');
+      return;
+    }
+    showLoading('Rewriting experience with AI...');
+    try {
+      const resp = await fetch('/api/improve-experience', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company, role, responsibilities })
+      });
+      const result = await resp.json();
+      if (result.success) {
+        item.querySelector('.exp-responsibilities').value = result.improved_responsibilities;
+        showToast('Experience rewritten!');
+      } else {
+        showToast(result.error || 'Failed.', 'error');
+      }
+    } catch (e) {
+      showToast('Network error: ' + e.message, 'error');
+    }
+    hideLoading();
+  }
+
+  // ===== AI: IMPROVE PROJECT =====
+  async function improveProject(id) {
+    const item = document.getElementById('proj-' + id);
+    if (!item) return;
+    const name = item.querySelector('.proj-name').value.trim();
+    const description = item.querySelector('.proj-desc').value.trim();
+    const technologies = item.querySelector('.proj-tech').value.trim();
+    if (!description) {
+      showToast('Please enter a project description first.', 'error');
+      return;
+    }
+    showLoading('Improving project description...');
+    try {
+      const resp = await fetch('/api/improve-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description, technologies })
+      });
+      const result = await resp.json();
+      if (result.success) {
+        item.querySelector('.proj-desc').value = result.improved_description;
+        showToast('Project description improved!');
+      } else {
+        showToast(result.error || 'Failed.', 'error');
+      }
+    } catch (e) {
+      showToast('Network error: ' + e.message, 'error');
+    }
+    hideLoading();
+  }
+
+  // ===== GENERATE RESUME =====
+  async function generateResume() {
+    const data = collectResumeData();
+    if (!data.name) {
+      showToast('Please enter your name.', 'error');
+      return;
+    }
+    showLoading('Generating your resume...');
+    try {
+      const resp = await fetch('/api/generate-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resume_data: data })
+      });
+      const result = await resp.json();
+      if (result.success) {
+        document.getElementById('resumePreview').innerHTML = result.resume_html;
+        showToast('Resume generated!');
+      } else {
+        showToast(result.error || 'Failed to generate resume.', 'error');
+      }
+    } catch (e) {
+      showToast('Network error: ' + e.message, 'error');
+    }
+    hideLoading();
+  }
+
+  // ===== OPTIMIZE RESUME WITH AI =====
+  async function optimizeResume() {
+    const data = collectResumeData();
+    if (!data.name) {
+      showToast('Please fill in your resume details first.', 'error');
+      return;
+    }
+    showLoading('Optimizing entire resume with AI...');
+    try {
+      const resp = await fetch('/api/optimize-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resume_data: data })
+      });
+      const result = await resp.json();
+      if (result.success && result.optimized) {
+        const opt = result.optimized;
+
+        // Update summary field
+        if (opt.professional_summary) {
+          document.getElementById('professional_summary').value = opt.professional_summary;
+        }
+
+        // Update project descriptions
+        if (opt.projects && Array.isArray(opt.projects)) {
+          const projItems = document.querySelectorAll('#projects-list .repeater-item');
+          opt.projects.forEach((desc, i) => {
+            if (projItems[i] && desc) {
+              projItems[i].querySelector('.proj-desc').value = desc;
+            }
+          });
+        }
+
+        // Update experience responsibilities
+        if (opt.experience && Array.isArray(opt.experience)) {
+          const expItems = document.querySelectorAll('#experience-list .repeater-item');
+          opt.experience.forEach((resp, i) => {
+            if (expItems[i] && resp) {
+              expItems[i].querySelector('.exp-responsibilities').value = resp;
+            }
+          });
+        }
+
+        showToast('Resume optimized! Click Generate Resume to see changes.');
+      } else {
+        showToast(result.error || 'Optimization failed.', 'error');
+      }
+    } catch (e) {
+      showToast('Network error: ' + e.message, 'error');
+    }
+    hideLoading();
+  }
+
+  // ===== DOWNLOAD PDF =====
+  function downloadPDF() {
+    const preview = document.getElementById('resumePreview');
+    if (!preview.querySelector('.resume-paper')) {
+      showToast('Generate a resume first before downloading.', 'error');
+      return;
+    }
+    window.print();
+  }
+
+</script>
+
+{% endblock %}

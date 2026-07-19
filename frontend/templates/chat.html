@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-title">AI Chat</div>
+
+<div class="split-layout">
+  <!-- Chat Sidebar -->
+  <div class="card" style="max-height: 600px;">
+    <h3 style="margin-bottom: 16px; font-family: 'Poppins', sans-serif; font-size: 16px; font-weight: 600;">Chats</h3>
+    <button class="btn btn-secondary" style="width: 100%; justify-content: center; margin-bottom: 12px;">
+      <i class="fas fa-plus"></i> New Chat
+    </button>
+    <div id="chatHistory" style="max-height: 400px; overflow-y: auto;">
+      <div style="padding: 12px; text-align: center; color: var(--muted); font-size: 13px;">
+        Start a new conversation
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Chat -->
+  <div style="display: flex; flex-direction: column; height: 600px;">
+    <div id="chatMessages" class="messages" style="flex: 1;"></div>
+    
+    <div class="composer">
+      <input id="chatInput" class="composer-input" placeholder="Ask anything..." style="padding: 12px; height: 44px;">
+      <button id="chatSend" class="btn btn-primary" style="height: 44px;">
+        <i class="fas fa-paper-plane"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // url_for keeps this URL correct if the application is mounted under a prefix.
+  const chatApiUrl = {{ url_for('chat.chat_api')|tojson }};
+  const chatInput = document.getElementById('chatInput');
+  const chatSend = document.getElementById('chatSend');
+  const chatMessages = document.getElementById('chatMessages');
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+  }
+
+  function addMessage(message, role = 'bot') {
+    const messageElement = document.createElement('div');
+    messageElement.className = role === 'user' ? 'message user' : 'message';
+    messageElement.innerHTML = `<div class="bubble ${role}">${escapeHtml(message)}</div>`;
+    chatMessages.appendChild(messageElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return messageElement;
+  }
+
+  async function readJsonResponse(response) {
+    const responseText = await response.text();
+    try {
+      return responseText ? JSON.parse(responseText) : {};
+    } catch (_) {
+      throw new Error(`The server returned ${response.status}, but not JSON: ${responseText.slice(0, 160) || 'empty response'}`);
+    }
+  }
+
+  async function sendMessage() {
+    const message = chatInput.value.trim();
+    if (!message || chatSend.disabled) return;
+
+    addMessage(message, 'user');
+    chatInput.value = '';
+    chatInput.disabled = true;
+    chatSend.disabled = true;
+
+    const typingMessage = addMessage('Thinking…');
+    typingMessage.querySelector('.bubble').innerHTML = '<span class="spinner" style="width: 12px; height: 12px;"></span>';
+
+    try {
+      console.info('Sending chat request to', chatApiUrl);
+      const response = await fetch(chatApiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ message }),
+        credentials: 'same-origin'
+      });
+      const data = await readJsonResponse(response);
+
+      if (!response.ok) {
+        throw new Error(data.error || `Request failed with HTTP ${response.status}`);
+      }
+      if (!data.answer) {
+        throw new Error(data.error || 'The server returned no answer.');
+      }
+
+      typingMessage.remove();
+      addMessage(data.answer);
+    } catch (error) {
+      console.error('Chat request failed.', { endpoint: chatApiUrl, error });
+      const detail = error instanceof Error ? error.message : String(error);
+      typingMessage.querySelector('.bubble').textContent = `Chat error: ${detail} (endpoint: ${chatApiUrl})`;
+      typingMessage.querySelector('.bubble').style.color = 'var(--muted)';
+    } finally {
+      chatInput.disabled = false;
+      chatSend.disabled = false;
+      chatInput.focus();
+    }
+  }
+
+  chatInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
+  });
+  chatSend.addEventListener('click', sendMessage);
+
+  window.addEventListener('error', (event) => console.error('Chat page JavaScript error:', event.error || event.message));
+  window.addEventListener('unhandledrejection', (event) => console.error('Unhandled chat page promise rejection:', event.reason));
+})();
+</script>
+{% endblock %}
