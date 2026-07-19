@@ -1,186 +1,101 @@
 """
 model_loader.py
 ===============
-Loads Qwen2.5-0.5B-Instruct and SentenceTransformer ONCE into global singletons.
+Handles OpenRouter API calls using requests.Session() and dynamic SentenceTransformer loading.
 """
 
+import os
 import logging
-import traceback
-from pathlib import Path
-
-import torch
-from transformers import AutoTokenizer, AutoModel, AutoModelForCausalLM
+import requests
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
-MODEL_DIR        = Path(__file__).parent.parent / "models" / "Qwen2.5-0.5B-Instruct"
+# Load environment variables from .env
+load_dotenv()
+
 EMBED_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
-TOKENIZER_MAX_LEN = 512
+# Reusable session for OpenRouter API requests
+_session = requests.Session()
 
-
-class LocalLLM:
-    """Wrapper around a local Causal-LM with a single .generate() entry-point."""
-
-    def __init__(self, model_dir=MODEL_DIR):
-        self.model_dir = str(model_dir)
-        self.device    = self._detect_device()
-        self._load()
-
-    def _detect_device(self):
-        if torch.cuda.is_available():
-            return "cuda"
-        if torch.backends.mps.is_available() and torch.backends.mps.is_built():
-            return "mps"
-        return "cpu"
-
-    def _load(self):
-        try:
-            logger.info("[LLM] Loading from %s on device=%s", self.model_dir, self.device)
-
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_dir,
-                trust_remote_code=True,
-                use_fast=False,
-                model_max_length=TOKENIZER_MAX_LEN,
-            )
-            if self.tokenizer.pad_token_id is None:
-                self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
-
-            logger.info("[LLM] Tokenizer loaded")
-
-            dtype = torch.float16 if self.device in ("mps", "cuda") else torch.float32
-
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_dir,
-                trust_remote_code=True,
-                dtype=dtype,
-            )
-            self.model.to(self.device)
-            self.model.eval()
-
-            logger.info("[LLM] Model loaded successfully on %s", self.device)
-
-        except Exception as exc:
-            logger.error("[LLM] Load failed: %s\n%s", exc, traceback.format_exc())
-            raise RuntimeError(f"Failed to load model from {self.model_dir}: {exc}") from exc
-
-    def generate(
-        self,
-        prompt: str,
-        max_new_tokens: int  = 180,
-        temperature: float   = 0.2,
-        do_sample: bool      = False,
-        top_p: float         = 0.9,
-        repetition_penalty: float = 1.15,
-        max_tokens: int      = 180,
-    ) -> str:
-        """
-        Generate text from `prompt` using eval mode and torch.inference_mode().
-        """
-        try:
-            inputs = self.tokenizer(
-                prompt,
-                return_tensors="pt",
-                truncation=True,
-                max_length=TOKENIZER_MAX_LEN,
-                padding=False,
-            ).to(self.device)
-
-            prompt_len = inputs.input_ids.shape[1]
-
-            gen_kwargs = {
-                "max_new_tokens"    : max_new_tokens,
-                "do_sample"         : do_sample,
-                "repetition_penalty": repetition_penalty,
-                "eos_token_id"      : self.tokenizer.eos_token_id,
-                "pad_token_id"      : self.tokenizer.pad_token_id,
-            }
-            if do_sample:
-                gen_kwargs["temperature"] = temperature
-                gen_kwargs["top_p"]       = top_p
-
-            with torch.inference_mode():
-                outputs = self.model.generate(**inputs, **gen_kwargs)
-
-            return self.tokenizer.decode(
-                outputs[0][prompt_len:], skip_special_tokens=True
-            )
-
-        except Exception as exc:
-            logger.error("[LLM] generate() failed: %s\n%s", exc, traceback.format_exc())
-            raise RuntimeError(f"LLM generation failed: {exc}") from exc
-
-
-class TransformersEmbedder:
-    """Mean-pool CLS embedder via vanilla Transformers."""
-
-    def __init__(self, model_name=EMBED_MODEL_NAME):
-        self.model_name = model_name
-        self.device = "cpu"
-        self._load()
-
-    def _load(self):
-        logger.info("[EMBED] Loading TransformersEmbedder from %s", self.model_name)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
-        self.model     = AutoModel.from_pretrained(self.model_name)
-        self.model.to(self.device)
-        self.model.eval()
-        logger.info("[EMBED] Fallback embedder ready")
-
-    def encode(self, texts, show_progress_bar=False):
-        if isinstance(texts, str):
-            texts = [texts]
-        enc = self.tokenizer(
-            texts, padding=True, truncation=True,
-            max_length=256, return_tensors="pt"
-        )
-        enc = {k: v.to(self.device) for k, v in enc.items()}
-        with torch.inference_mode():
-            out = self.model(**enc, return_dict=True)
-        hidden = out.last_hidden_state
-        mask   = enc["attention_mask"].unsqueeze(-1).float()
-        vecs   = (hidden * mask).sum(1) / mask.sum(1).clamp(min=1)
-        return vecs.cpu().numpy()
-
-
-_llm: LocalLLM | None = None
-_llm_error: str | None = None
+# Cache for FAISS indexes
+_faiss_cache = {}
 _embedder = None
-_faiss_cache: dict = {}
 
 
-def get_llm() -> LocalLLM | None:
-    global _llm, _llm_error
-    if _llm is None and _llm_error is None:
-        try:
-            _llm = LocalLLM()
-        except Exception as exc:
-            _llm_error = str(exc)
-            logger.error("[LLM] Could not load: %s", exc)
-    return _llm
+def generate_response(prompt: str) -> str:
+    """
+    Generate a response using the OpenRouter API.
+    Handles timeouts, rate limits, network errors, and invalid keys.
+    """
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        logger.error("[OpenRouter] OPENROUTER_API_KEY is not set.")
+        return "Error: OpenRouter API key is missing. Please check your .env file configuration."
 
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "openrouter/free",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ]
+    }
 
-def get_llm_error() -> str | None:
-    return _llm_error
+    try:
+        response = _session.post(url, headers=headers, json=payload, timeout=60)
+        
+        if response.status_code == 401:
+            logger.error("[OpenRouter] Unauthorized (401). Invalid API key.")
+            return "Error: Invalid OpenRouter API key. Please check your credentials."
+        
+        if response.status_code == 429:
+            logger.warning("[OpenRouter] Rate limit exceeded (429).")
+            return "Error: Rate limit exceeded. Please try again in a moment."
+            
+        if response.status_code != 200:
+            logger.error("[OpenRouter] API error: status %d, response: %s", response.status_code, response.text)
+            return f"Error: OpenRouter API returned an error (status code {response.status_code})."
+            
+        data = response.json()
+        if not data or "choices" not in data or not data["choices"]:
+            logger.error("[OpenRouter] Empty or malformed response: %s", data)
+            return "Error: Received an empty response from the OpenRouter API."
+            
+        content = data["choices"][0]["message"]["content"]
+        if not content or not content.strip():
+            logger.warning("[OpenRouter] Generated content is empty.")
+            return "Error: The model returned an empty response."
+            
+        return content
+
+    except requests.exceptions.Timeout:
+        logger.error("[OpenRouter] Request timed out.")
+        return "Error: Request to the AI service timed out. Please try again."
+    except requests.exceptions.RequestException as e:
+        logger.error("[OpenRouter] Network error: %s", e)
+        return "Error: A network error occurred while communicating with the AI service."
+    except Exception as e:
+        logger.error("[OpenRouter] Unexpected error: %s", e)
+        return "Error: An unexpected error occurred while generating the response."
 
 
 def get_embedder():
+    """Dynamically load and return the SentenceTransformer embedder."""
     global _embedder
     if _embedder is None:
         try:
             from sentence_transformers import SentenceTransformer
-            logger.info("[EMBED] Loading SentenceTransformer…")
+            logger.info("[EMBED] Loading SentenceTransformer...")
             _embedder = SentenceTransformer(EMBED_MODEL_NAME)
             logger.info("[EMBED] SentenceTransformer ready")
         except Exception as exc:
-            logger.warning("[EMBED] SentenceTransformer failed (%s). Falling back.", exc)
-            try:
-                _embedder = TransformersEmbedder()
-            except Exception as fb_exc:
-                logger.error("[EMBED] Fallback also failed: %s", fb_exc)
-                _embedder = None
+            logger.error("[EMBED] SentenceTransformer loading failed: %s", exc)
+            _embedder = None
     return _embedder
 
 

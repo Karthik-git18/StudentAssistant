@@ -20,7 +20,7 @@ from model_loader import (
     clear_faiss_cache,
     get_cached_faiss,
     get_embedder,
-    get_llm,
+    generate_response,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ _GEN_SUMMARY = dict(max_new_tokens=260, temperature=0.2, do_sample=False, top_p=
 _GEN_TOPICS  = dict(max_new_tokens=180, temperature=0.1, do_sample=False, top_p=0.9, repetition_penalty=1.1)
 
 # ── Static return strings ──────────────────────────────────────────────────────
-_NOT_FOUND = "I couldn't find that information in the uploaded PDF."
+_NOT_FOUND = "I couldn't find that information in the uploaded document."
 _NO_INFO   = "No sufficient information found."
 _NO_TOPICS = "No topics found."
 
@@ -471,10 +471,7 @@ def detect_intent(question: str) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _llm_call(prompt: str, **gen_kwargs) -> str:
-    llm = get_llm()
-    if llm is None:
-        raise RuntimeError("LLM not available")
-    raw = llm.generate(prompt, **gen_kwargs)
+    raw = generate_response(prompt)
     return clean_output(raw)
 
 
@@ -485,25 +482,16 @@ def answer_question(context: str, question: str) -> str:
         return _NOT_FOUND
 
     prompt = (
-        "You are an intelligent Student Learning Assistant.\n"
-        "Answer ONLY using the uploaded PDF context below.\n"
-        "Never use outside knowledge. Never hallucinate. Never guess.\n"
-        f"If the answer is not found, reply exactly with: \"{_NOT_FOUND}\"\n\n"
-        "You MUST structure your response exactly as follows:\n\n"
-        "Title\n"
-        "<A short descriptive title>\n\n"
-        "Explanation\n"
-        "<Detailed explanation in professional English. Never copy paragraphs directly. Keep it medium length.>\n\n"
-        "Important Points\n"
-        "• <Key point 1>\n"
-        "• <Key point 2>\n\n"
-        "Conclusion\n"
-        "<1-2 sentence concluding summary>\n\n"
-        f"Document context:\n{context}\n\n"
-        f"Question: {question}\n\n"
-        "Answer:"
+        f"Context\n{context}\n\n"
+        f"Question\n{question}\n\n"
+        "Instructions\n"
+        "Answer ONLY from the context.\n"
+        "If the answer is unavailable say\n"
+        f"\"{_NOT_FOUND}\"\n"
+        "Never hallucinate.\n"
+        "Never invent information."
     )
-    result = _llm_call(prompt, **_GEN_LA)
+    result = _llm_call(prompt)
     return result if result.strip() else _NOT_FOUND
 
 

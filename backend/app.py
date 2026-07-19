@@ -11,7 +11,7 @@ from rag import (
     retrieve_context, clean_output, generate_summary, extract_topics,
     answer_question, route_learning_query,
 )
-from model_loader import get_llm, get_embedder
+from model_loader import generate_response, get_embedder
 from database import get_conn, get_user_by_id, count_user_items, update_user, create_upload, is_duplicate_upload, get_user_uploads, get_upload, delete_upload, get_recent_uploads, get_recent_chats, get_recent_plans
 from html import escape
 import logging
@@ -35,9 +35,12 @@ def create_app():
     except Exception:
         pass
 
+    # Load environment variables
+    from dotenv import load_dotenv
+    load_dotenv()
+
     # Warm-up model cache
     try:
-        get_llm()
         get_embedder()
     except Exception:
         pass
@@ -473,40 +476,32 @@ def create_app():
                 if c:
                     exp_str += f"{r} at {c}. " if r else f"{c}. "
 
-        prompt = f"""<|im_start|>system
-You are an expert ATS Resume Writer.
+        prompt = f"""Generate an ATS-friendly professional resume.
+Improve grammar.
+Improve formatting.
+Improve project descriptions.
+Keep the user's original information.
 
 Using ONLY the candidate information provided, write a professional summary.
-
 Rules:
 - 50-80 words
 - One paragraph
 - Professional tone
 - ATS optimized
-- No markdown
-- No headings
-- No asterisks
-- No hash symbols
-- Do not repeat labels like "Name:" or "Skills:"
-- Do not invent information
+- No markdown, headings, asterisks, hash symbols
 - Return only the summary text, nothing else
-<|im_end|>
-<|im_start|>user
+
 Candidate Information:
 Name: {name}
 Title: {title}
 Skills: {skills}
 Education: {edu_str}
 Projects: {proj_str}
-Experience: {exp_str}
-<|im_end|>
-<|im_start|>assistant
-"""
+Experience: {exp_str}"""
         try:
-            llm = get_llm()
-            if not llm:
-                return jsonify({'error': 'LLM not available'}), 500
-            raw = llm.generate(prompt, max_tokens=180).strip()
+            raw = generate_response(prompt).strip()
+            if raw.startswith("Error:"):
+                return jsonify({'error': raw}), 500
             cleaned = _clean_llm_output(raw)
             return jsonify({'success': True, 'summary': cleaned})
         except Exception as e:
@@ -523,35 +518,29 @@ Experience: {exp_str}
         pdesc = data.get('description', '').strip()
         ptech = data.get('technologies', '').strip()
 
-        prompt = f"""<|im_start|>system
-You are an ATS Resume Writer.
+        prompt = f"""Generate an ATS-friendly professional resume.
+Improve grammar.
+Improve formatting.
+Improve project descriptions.
+Keep the user's original information.
 
 Rewrite this project description professionally.
-
 Rules:
 - 3-4 concise resume bullet points
 - Professional language
 - Highlight technologies
 - No fake information
-- No markdown
-- No asterisks
-- No hash symbols
-- No headings
+- No markdown, asterisks, hash symbols, headings
 - Each bullet point starts with a dash and a space
 - Return only the bullet points, nothing else
-<|im_end|>
-<|im_start|>user
+
 Project Name: {pname}
 Technologies: {ptech}
-Description: {pdesc}
-<|im_end|>
-<|im_start|>assistant
-"""
+Description: {pdesc}"""
         try:
-            llm = get_llm()
-            if not llm:
-                return jsonify({'error': 'LLM not available'}), 500
-            raw = llm.generate(prompt, max_tokens=150).strip()
+            raw = generate_response(prompt).strip()
+            if raw.startswith("Error:"):
+                return jsonify({'error': raw}), 500
             cleaned = _clean_llm_output(raw)
             return jsonify({'success': True, 'improved_description': cleaned})
         except Exception as e:
@@ -568,34 +557,28 @@ Description: {pdesc}
         role = data.get('role', '').strip()
         responsibilities = data.get('responsibilities', '').strip()
 
-        prompt = f"""<|im_start|>system
-You are an ATS Resume Writer.
+        prompt = f"""Generate an ATS-friendly professional resume.
+Improve grammar.
+Improve formatting.
+Improve project descriptions.
+Keep the user's original information.
 
 Rewrite the following work notes into 3-5 professional resume bullet points.
-
 Rules:
 - Professional language
 - Strong action verbs
 - No fake information
-- No markdown
-- No asterisks
-- No hash symbols
-- No headings
+- No markdown, asterisks, hash symbols, headings
 - Each bullet point starts with a dash and a space
 - Return only the bullet points, nothing else
-<|im_end|>
-<|im_start|>user
+
 Company: {company}
 Role: {role}
-Work Notes: {responsibilities}
-<|im_end|>
-<|im_start|>assistant
-"""
+Work Notes: {responsibilities}"""
         try:
-            llm = get_llm()
-            if not llm:
-                return jsonify({'error': 'LLM not available'}), 500
-            raw = llm.generate(prompt, max_tokens=250).strip()
+            raw = generate_response(prompt).strip()
+            if raw.startswith("Error:"):
+                return jsonify({'error': raw}), 500
             cleaned = _clean_llm_output(raw)
             # Extract bullet lines
             lines = []
@@ -630,15 +613,15 @@ Work Notes: {responsibilities}
         rd = data.get('resume_data', {})
         results = {}
 
-        llm = get_llm()
-        if not llm:
-            return jsonify({'error': 'LLM not available'}), 500
-
         # 1. Optimize summary
         summary = rd.get('professional_summary', '').strip()
         if summary:
-            prompt = f"""<|im_start|>system
-You are an expert ATS Resume Writer.
+            prompt = f"""Generate an ATS-friendly professional resume.
+Improve grammar.
+Improve formatting.
+Improve project descriptions.
+Keep the user's original information.
+
 Improve this professional summary. Make it more professional, ATS-optimized, and polished.
 Rules:
 - 50-80 words
@@ -649,15 +632,14 @@ Rules:
 - Do not invent any new information
 - No markdown, no asterisks, no hash symbols, no headings
 - Return only the improved summary text
-<|im_end|>
-<|im_start|>user
-{summary}
-<|im_end|>
-<|im_start|>assistant
-"""
+
+{summary}"""
             try:
-                raw = llm.generate(prompt, max_tokens=180).strip()
-                results['professional_summary'] = _clean_llm_output(raw)
+                raw = generate_response(prompt).strip()
+                if not raw.startswith("Error:"):
+                    results['professional_summary'] = _clean_llm_output(raw)
+                else:
+                    results['professional_summary'] = summary
             except Exception:
                 results['professional_summary'] = summary
 
@@ -670,8 +652,12 @@ Rules:
                 pname = proj.get('name', '').strip()
                 ptech = proj.get('technologies', '').strip()
                 if desc and pname:
-                    prompt = f"""<|im_start|>system
-You are an ATS Resume Writer.
+                    prompt = f"""Generate an ATS-friendly professional resume.
+Improve grammar.
+Improve formatting.
+Improve project descriptions.
+Keep the user's original information.
+
 Improve this project description. Make it more professional, ATS-friendly, and polished.
 Rules:
 - 2-4 lines
@@ -681,17 +667,16 @@ Rules:
 - Do not invent any new information
 - No markdown, no asterisks, no hash symbols, no headings
 - Return only the improved description
-<|im_end|>
-<|im_start|>user
+
 Project: {pname}
 Technologies: {ptech}
-Current Description: {desc}
-<|im_end|>
-<|im_start|>assistant
-"""
+Current Description: {desc}"""
                     try:
-                        raw = llm.generate(prompt, max_tokens=150).strip()
-                        optimized_projects.append(_clean_llm_output(raw))
+                        raw = generate_response(prompt).strip()
+                        if not raw.startswith("Error:"):
+                            optimized_projects.append(_clean_llm_output(raw))
+                        else:
+                            optimized_projects.append(desc)
                     except Exception:
                         optimized_projects.append(desc)
                 else:
@@ -707,8 +692,12 @@ Current Description: {desc}
                 role = exp.get('role', '').strip()
                 comp = exp.get('company', '').strip()
                 if resp and comp:
-                    prompt = f"""<|im_start|>system
-You are an ATS Resume Writer.
+                    prompt = f"""Generate an ATS-friendly professional resume.
+Improve grammar.
+Improve formatting.
+Improve project descriptions.
+Keep the user's original information.
+
 Improve these resume bullet points. Make them more professional and ATS-optimized.
 Rules:
 - 3-5 bullet points
@@ -719,31 +708,30 @@ Rules:
 - No markdown, no asterisks, no hash symbols, no headings
 - Each bullet point starts with a dash and a space
 - Return only the bullet points
-<|im_end|>
-<|im_start|>user
+
 Role: {role} at {comp}
-Current bullets: {resp}
-<|im_end|>
-<|im_start|>assistant
-"""
+Current bullets: {resp}"""
                     try:
-                        raw = llm.generate(prompt, max_tokens=250).strip()
-                        cleaned = _clean_llm_output(raw)
-                        lines = []
-                        for line in cleaned.splitlines():
-                            line = line.strip()
-                            if not line:
-                                continue
-                            for marker in ['- ', '* ', '• ', '– ']:
-                                if line.startswith(marker):
-                                    line = line[len(marker):]
-                                    break
-                            import re as _re
-                            line = _re.sub(r'^\d+[\.\)]\s*', '', line)
-                            if line:
-                                lines.append(line)
-                        lines = lines[:5]
-                        optimized_exp.append("\n".join(f"- {l}" for l in lines))
+                        raw = generate_response(prompt).strip()
+                        if not raw.startswith("Error:"):
+                            cleaned = _clean_llm_output(raw)
+                            lines = []
+                            for line in cleaned.splitlines():
+                                line = line.strip()
+                                if not line:
+                                    continue
+                                for marker in ['- ', '* ', '• ', '– ']:
+                                    if line.startswith(marker):
+                                        line = line[len(marker):]
+                                        break
+                                import re as _re
+                                line = _re.sub(r'^\d+[\.\)]\s*', '', line)
+                                if line:
+                                    lines.append(line)
+                            lines = lines[:5]
+                            optimized_exp.append("\n".join(f"- {l}" for l in lines))
+                        else:
+                            optimized_exp.append(resp)
                     except Exception:
                         optimized_exp.append(resp)
                 else:
