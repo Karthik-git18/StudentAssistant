@@ -15,7 +15,7 @@ import faiss
 import numpy as np
 import fitz  # PyMuPDF
 
-from model_loader import (
+from backend.model_loader import (
     cache_faiss_index,
     clear_faiss_cache,
     get_cached_faiss,

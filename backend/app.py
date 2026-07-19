@@ -3,16 +3,21 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 from hashlib import sha256
 import traceback
-from auth import bp as auth_bp
-from chat import bp as chat_bp
-from rag import (
+from backend.auth import bp as auth_bp
+from backend.chat import bp as chat_bp
+from backend.rag import (
     extract_text_from_pdf, chunk_text, build_faiss_index,
     delete_document_index, INDEX_DIR, load_index, query_index,
     retrieve_context, clean_output, generate_summary, extract_topics,
     answer_question, route_learning_query,
 )
-from model_loader import generate_response, get_embedder
-from database import get_conn, get_user_by_id, count_user_items, update_user, create_upload, is_duplicate_upload, get_user_uploads, get_upload, delete_upload, get_recent_uploads, get_recent_chats, get_recent_plans
+from backend.model_loader import generate_response, get_embedder
+from backend.database import (
+    get_conn, get_user_by_id, count_user_items, update_user,
+    create_upload, is_duplicate_upload, get_user_uploads,
+    get_upload, delete_upload, get_recent_uploads,
+    get_recent_chats, get_recent_plans,
+)
 from html import escape
 import logging
 import os
@@ -30,7 +35,7 @@ def create_app():
     app.register_blueprint(chat_bp)
     # ensure database schema exists
     try:
-        from database import init_db
+        from backend.database import init_db
         init_db()
     except Exception:
         pass
@@ -348,7 +353,7 @@ def create_app():
 
         # Persist to chat history (non-fatal)
         try:
-            from database import create_chat
+            from backend.database import create_chat
             create_chat(user_id, 'user',      question)
             create_chat(user_id, 'assistant', out)
         except Exception:
@@ -421,7 +426,7 @@ def create_app():
             topics = []
             # Try raw heading extraction first
             if pdf_text.strip():
-                from rag import extract_headings_from_text
+                from backend.rag import extract_headings_from_text
                 topics = extract_headings_from_text(pdf_text)
 
             # Fall back to LLM topics extraction if none found

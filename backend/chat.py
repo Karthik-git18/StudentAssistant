@@ -7,11 +7,9 @@ AI Chat blueprint – behaves like a general-purpose assistant (ChatGPT-style).
 import logging
 
 from flask import Blueprint, jsonify, request, session
-
-from database import create_chat
-from model_loader import generate_response
-from rag import clean_output
-
+from backend.database import create_chat
+from backend.model_loader import generate_response
+from backend.rag import clean_output
 logger = logging.getLogger(__name__)
 bp = Blueprint("chat", __name__)
 

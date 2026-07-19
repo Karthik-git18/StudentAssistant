@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from database import create_user, get_user_by_email, verify_user, init_db
+from backend.database import create_user, get_user_by_email, verify_user, init_db
 from datetime import datetime
 
 bp = Blueprint('auth', __name__)
@@ -34,7 +34,7 @@ def login():
             session['user_id'] = user['id']
             session['user_name'] = user['name']
             try:
-                from database import update_last_login
+                from backend.database import update_last_login
                 update_last_login(user['id'])
             except Exception:
                 pass
