@@ -11,7 +11,7 @@ from backend.rag import (
     retrieve_context, clean_output, generate_summary, extract_topics,
     answer_question, route_learning_query,
 )
-from backend.model_loader import generate_response, get_embedder
+from backend.model_loader import generate_response
 from backend.database import (
     get_conn, get_user_by_id, count_user_items, update_user,
     create_upload, is_duplicate_upload, get_user_uploads,
@@ -45,10 +45,7 @@ def create_app():
     load_dotenv()
 
     # Warm-up model cache
-    try:
-        get_embedder()
-    except Exception:
-        pass
+  
 
     @app.context_processor
     def inject_user():

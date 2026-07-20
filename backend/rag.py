@@ -19,9 +19,9 @@ from backend.model_loader import (
     cache_faiss_index,
     clear_faiss_cache,
     get_cached_faiss,
-    get_embedder,
     generate_response,
 )
+from backend.model_loader import generate_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -99,11 +99,8 @@ def _normalize(vecs: np.ndarray) -> np.ndarray:
 
 
 def _encode(texts) -> np.ndarray:
-    embedder = get_embedder()
-    if embedder is None:
-        raise RuntimeError("Embedder not available")
-    raw = embedder.encode(texts, show_progress_bar=False)
-    return _normalize(np.array(raw, dtype="float32"))
+    # Use remote Gemini embeddings via the model_loader wrapper
+    return generate_embeddings(texts)
 
 
 def _save_chunks(index_path: str, chunks: list):
@@ -210,10 +207,10 @@ def delete_document_index(index_path, cache_key=None):
 
 def query_index(index, chunks, question: str, top_k: int = FAISS_TOP_K) -> list:
     """Legacy wrapper kept for backwards compatibility."""
-    embedder = get_embedder()
-    if not embedder:
+    try:
+        qvec = generate_embeddings([question])
+    except Exception:
         return []
-    qvec = _normalize(np.array(embedder.encode([question]), dtype="float32"))
     D, I = index.search(qvec, top_k)
     return [chunks[i] for i in I[0] if 0 <= i < len(chunks)]
 
@@ -232,11 +229,13 @@ def retrieve_context(
     """
     Retrieve the most relevant chunks for `query` sorted by similarity score.
     """
-    embedder = get_embedder()
-    if not embedder or not chunks:
+    if not chunks:
         return "No relevant content found."
 
-    qvec = _normalize(np.array(embedder.encode([query]), dtype="float32"))
+    try:
+        qvec = generate_embeddings([query])
+    except Exception:
+        return "No relevant content found."
     D, I = index.search(qvec, min(top_k, len(chunks)))
 
     if not len(D) or not len(I):
