@@ -3,87 +3,141 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Student Assistant</title>
+  <title>Student AI - SaaS Platform</title>
+  <!-- FontAwesome and Google Fonts -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
+  {% block extra_head %}{% endblock %}
 </head>
 <body>
   <div class="app-layout">
-    <!-- Sidebar -->
-    <aside class="sidebar">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="appSidebar">
       <div class="sidebar-header">
         <div class="logo">
-          <i class="fas fa-brain"></i> Student AI
+          <i class="fas fa-brain"></i>
+          <span>Student AI</span>
         </div>
       </div>
       
       <nav class="sidebar-nav">
+        <!-- Student Features Group -->
+        {% if user_role == 'student' %}
         <div class="nav-group">
-          <div class="nav-group-title">Main</div>
+          <div class="nav-group-title">Learning Hub</div>
           <a href="/home" class="nav-item" data-page="home">
-            <i class="fas fa-home"></i> Dashboard
+            <i class="fas fa-chart-pie"></i> Dashboard
           </a>
           <a href="/learning" class="nav-item" data-page="learning">
-            <i class="fas fa-book"></i> Learning
+            <i class="fas fa-graduation-cap"></i> Learning Assistant
           </a>
           <a href="/chat" class="nav-item" data-page="chat">
-            <i class="fas fa-robot"></i> AI Chat
+            <i class="fas fa-comment-alt"></i> AI Chat Workspace
           </a>
           <a href="/resume" class="nav-item" data-page="resume">
-            <i class="fas fa-file-alt"></i> Resume Builder
+            <i class="fas fa-file-invoice-alt"></i> AI Resume Builder
           </a>
         </div>
+        {% endif %}
 
+        <!-- Admin Features Group -->
+        {% if user_role == 'admin' %}
+        <div class="nav-group">
+          <div class="nav-group-title">Admin Management</div>
+          <a href="/admin/dashboard" class="nav-item" data-page="admin/dashboard">
+            <i class="fas fa-tachometer-alt"></i> Overview
+          </a>
+          <a href="/admin/students" class="nav-item" data-page="admin/students">
+            <i class="fas fa-users-cog"></i> Manage Students
+          </a>
+          <a href="/admin/documents" class="nav-item" data-page="admin/documents">
+            <i class="fas fa-folder-open"></i> PDF Documents
+          </a>
+          <a href="/admin/logs" class="nav-item" data-page="admin/logs">
+            <i class="fas fa-history"></i> System Audit Logs
+          </a>
+          <a href="/admin/analytics" class="nav-item" data-page="admin/analytics">
+            <i class="fas fa-chart-line"></i> Usage Analytics
+          </a>
+        </div>
+        {% endif %}
+
+        <!-- Account Settings Group -->
         <div class="nav-group">
           <div class="nav-group-title">Account</div>
           <a href="/profile" class="nav-item" data-page="profile">
-            <i class="fas fa-user"></i> Profile
+            <i class="fas fa-user-circle"></i> Profile Page
           </a>
         </div>
       </nav>
 
       <div class="sidebar-footer">
-        <a href="/logout" class="nav-item">
+        <a href="/logout" class="nav-item" style="color: var(--danger);">
           <i class="fas fa-sign-out-alt"></i> Logout
         </a>
       </div>
     </aside>
 
-    <!-- Navbar -->
-    <nav class="navbar">
-      <div class="navbar-left">
-        <div class="search-bar">
-          <i class="fas fa-search"></i>
-          <input type="text" placeholder="Search...">
+    <!-- Main Content Wrapper -->
+    <div class="main-wrapper">
+      <!-- Navbar Header -->
+      <nav class="navbar">
+        <div class="navbar-left">
+          <button class="menu-toggle" id="mobileMenuToggle">
+            <i class="fas fa-bars"></i>
+          </button>
+          <div class="logo-text h3" style="margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--text-primary);">
+            {% block section_title %}Student Portal{% endblock %}
+          </div>
         </div>
-      </div>
-      
-      <div class="navbar-right">
-        <button class="navbar-icon">
-          <i class="fas fa-bell"></i>
-        </button>
-        <div class="user-avatar" onclick="alert('Profile')">{{ user_name[0] if user_name else 'U' }}</div>
-      </div>
-    </nav>
+        
+        <div class="navbar-right">
+          <!-- Light/Dark Mode Switcher -->
+          <button class="navbar-icon" id="themeToggle" title="Toggle Theme">
+            <i class="fas fa-moon"></i>
+          </button>
+          
+          <!-- Profile Quick Info -->
+          <div class="user-profile-menu" onclick="window.location.href='/profile'">
+            <div class="user-avatar" title="View Profile">
+              {{ user_name[0].upper() if user_name else 'U' }}
+            </div>
+            <div class="profile-details-nav" style="display: flex; flex-direction: column; line-height: 1.2;">
+              <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">{{ user_name or 'User' }}</span>
+              <span style="font-size: 10px; color: var(--text-muted); text-transform: capitalize;">{{ user_role or 'Student' }}</span>
+            </div>
+          </div>
+        </div>
+      </nav>
 
-    <!-- Main Content -->
-    <main class="main-content">
-      <div class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for cat, msg in messages %}
-              <div class="notification {{ 'success' if cat == 'success' else 'error' if cat == 'danger' else 'info' }}">
-                <i class="fas fa-{{ 'check-circle' if cat == 'success' else 'exclamation-circle' if cat == 'danger' else 'info-circle' }}"></i>
-                <span>{{ msg }}</span>
-              </div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
-      </div>
-    </main>
+      <!-- Main Layout Body -->
+      <main class="main-content">
+        <div class="container">
+          {% block content %}{% endblock %}
+        </div>
+      </main>
+    </div>
   </div>
 
+  <!-- Global scripts -->
   <script src="/static/js/main.js"></script>
+  
+  <!-- Trigger flashed notifications -->
+  <div id="toastContainer" class="notification-container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+          {% set toast_type = 'success' if cat == 'success' else 'danger' if cat == 'danger' else 'info' %}
+          <div class="notification {{ toast_type }}">
+            <i class="fas fa-{{ 'check-circle' if toast_type == 'success' else 'exclamation-circle' if toast_type == 'danger' else 'info-circle' }}"></i>
+            <span style="flex:1">{{ msg }}</span>
+            <i class="fas fa-times" style="font-size:12px; cursor:pointer; opacity:0.6" onclick="this.parentElement.remove()"></i>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  {% block extra_scripts %}{% endblock %}
 </body>
 </html>

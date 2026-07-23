@@ -1,161 +1,309 @@
 {% extends 'base.html' %}
+{% block section_title %}Account Profile{% endblock %}
+
 {% block content %}
-<div class="page-title">Profile</div>
+<div class="page-header">
+  <h1 class="page-title">Profile Settings</h1>
+</div>
 
-<div class="split-layout">
-  <!-- Profile Info -->
-  <div class="card">
-    <div style="text-align: center; margin-bottom: 24px;">
-      <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #4F46E5, #7C3AED); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: 700; margin: 0 auto 16px;">
-        {{ user['name'][0] if user['name'] else 'U' }}
+<div class="profile-layout">
+  <!-- Left Side: Profile Picture & Core Actions -->
+  <div style="display: flex; flex-direction: column; gap: 24px;">
+    <div class="card avatar-upload-container">
+      <div class="profile-avatar-large" id="avatarPreviewContainer">
+        {% if user.profile_pic %}
+          <img src="{{ user.profile_pic }}" alt="Avatar" id="avatarImage" style="width: 100%; height: 100%; object-fit: cover;">
+        {% else %}
+          <span id="avatarInitial">{{ user.name[0].upper() }}</span>
+        {% endif %}
+        <div class="avatar-overlay" onclick="document.getElementById('avatarFileInput').click()">
+          <i class="fas fa-camera"></i> Change
+        </div>
       </div>
-      <h2 id="profileName" style="margin: 0 0 4px; font-family: 'Poppins', sans-serif; font-size: 20px; font-weight: 600;">{{ user['name'] or 'User' }}</h2>
-      <p id="profileRole" style="color: var(--muted); font-size: 13px;">Student</p>
+      <input type="file" id="avatarFileInput" accept="image/png, image/jpeg, image/jpg" style="display: none;" onchange="handleAvatarUpload(this)">
+      
+      <h2 style="margin-top: 16px; font-size: 18px;">{{ user.name }}</h2>
+      <span style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">{{ user.role }}</span>
+      
+      <div style="border-top: 1px solid var(--border-color); width: 100%; margin-top: 20px; padding-top: 20px; display: flex; flex-direction: column; gap: 12px; text-align: left;">
+        <div>
+          <span style="font-size: 11px; color: var(--text-muted); display: block;">Joined System</span>
+          <span style="font-size: 13px; font-weight: 500; color: var(--text-primary);">{{ user.created_at[:16] if user.created_at else 'N/A' }}</span>
+        </div>
+        <div>
+          <span style="font-size: 11px; color: var(--text-muted); display: block;">Account Status</span>
+          <span class="badge badge-active">{{ user.status }}</span>
+        </div>
+      </div>
     </div>
 
-    <div style="space-y: 12px;">
-      <div class="profile-field">
-        <div class="profile-label">Email</div>
-        <div id="profileEmail" class="profile-value">{{ user['email'] or 'N/A' }}</div>
-      </div>
-
-      <div class="profile-field">
-        <div class="profile-label">Roll Number</div>
-        <div id="profileRoll" class="profile-value">{{ user['roll'] or 'N/A' }}</div>
-      </div>
-
-      <div class="profile-field">
-        <div class="profile-label">Branch</div>
-        <div id="profileBranch" class="profile-value">{{ user['branch'] or 'N/A' }}</div>
-      </div>
-
-      <div class="profile-field">
-        <div class="profile-label">Semester</div>
-        <div id="profileSemester" class="profile-value">{{ user['semester'] or 'N/A' }}</div>
-      </div>
+    <!-- Quick action buttons -->
+    <div class="card" style="display: flex; flex-direction: column; gap: 12px; padding: 16px;">
+      <button class="btn btn-secondary" onclick="openModal('editProfileModal')" style="justify-content: center;"><i class="fas fa-edit"></i> Edit Details</button>
+      <button class="btn btn-secondary" onclick="openModal('changePasswordModal')" style="justify-content: center;"><i class="fas fa-key"></i> Change Password</button>
+      <button class="btn btn-danger" onclick="confirmDeleteAccount()" style="justify-content: center;"><i class="fas fa-trash-alt"></i> Delete Account</button>
     </div>
-
-    <button id="editProfileButton" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 16px;">
-      <i class="fas fa-edit"></i> Edit Profile
-    </button>
   </div>
 
-  <!-- Statistics -->
-  <div class="card">
-    <h3 style="margin-bottom: 20px; font-family: 'Poppins', sans-serif; font-size: 16px; font-weight: 600;">Statistics</h3>
+  <!-- Right Side: Details & Statistics -->
+  <div style="display: flex; flex-direction: column; gap: 24px;">
+    <!-- Stats block -->
+    <div class="card">
+      <h3 class="card-title" style="margin-bottom: 20px;">Workspace Usage Metrics</h3>
+      <div class="grid grid-4" style="gap: 16px;">
+        <div style="text-align: center; padding: 16px; background-color: var(--bg-secondary); border-radius: 8px;">
+          <i class="fas fa-file-pdf" style="font-size: 20px; color: var(--accent-primary); margin-bottom: 8px;"></i>
+          <span style="display: block; font-size: 20px; font-weight: 700; color: var(--text-primary);">{{ stats.uploads or 0 }}</span>
+          <span style="font-size: 11px; color: var(--text-muted);">PDFs Uploaded</span>
+        </div>
+        
+        <div style="text-align: center; padding: 16px; background-color: var(--bg-secondary); border-radius: 8px;">
+          <i class="fas fa-question-circle" style="font-size: 20px; color: var(--success); margin-bottom: 8px;"></i>
+          <span style="display: block; font-size: 20px; font-weight: 700; color: var(--text-primary);">{{ stats.questions or 0 }}</span>
+          <span style="font-size: 11px; color: var(--text-muted);">Questions Asked</span>
+        </div>
 
-    <div class="stat-card stat-blue">
-      <div class="stat-label">QUESTIONS ASKED</div>
-      <div id="statQuestions" class="stat-value">{{ stats['questions'] or 0 }}</div>
+        <div style="text-align: center; padding: 16px; background-color: var(--bg-secondary); border-radius: 8px;">
+          <i class="fas fa-file-invoice-alt" style="font-size: 20px; color: var(--warning); margin-bottom: 8px;"></i>
+          <span style="display: block; font-size: 20px; font-weight: 700; color: var(--text-primary);">{{ stats.resumes or 0 }}</span>
+          <span style="font-size: 11px; color: var(--text-muted);">Resumes Created</span>
+        </div>
+
+        <div style="text-align: center; padding: 16px; background-color: var(--bg-secondary); border-radius: 8px;">
+          <i class="fas fa-history" style="font-size: 20px; color: #8B5CF6; margin-bottom: 8px;"></i>
+          <span style="display: block; font-size: 20px; font-weight: 700; color: var(--text-primary);">{{ study_sessions or 0 }}</span>
+          <span style="font-size: 11px; color: var(--text-muted);">Study Sessions</span>
+        </div>
+      </div>
     </div>
 
-    <div class="stat-card stat-cyan">
-      <div class="stat-label">UPLOADED PDFs</div>
-      <div id="statUploads" class="stat-value">{{ stats['uploads'] or 0 }}</div>
-    </div>
-
-    <div class="stat-card stat-green">
-      <div class="stat-label">STUDY PLANS CREATED</div>
-      <div id="statPlans" class="stat-value">{{ stats['plans'] or 0 }}</div>
+    <!-- Personal & Academic Details Card -->
+    <div class="card">
+      <h3 class="card-title" style="margin-bottom: 20px;">Personal & Academic Profile</h3>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <div>
+          <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Primary Email</span>
+          <span style="font-size: 14px; font-weight: 500; color: var(--text-primary);">{{ user.email }}</span>
+        </div>
+        <div>
+          <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Contact Phone</span>
+          <span style="font-size: 14px; font-weight: 500; color: var(--text-primary);">{{ user.phone or 'Not Provided' }}</span>
+        </div>
+        <div>
+          <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Department / Major</span>
+          <span style="font-size: 14px; font-weight: 500; color: var(--text-primary);">{{ user.department or 'Not Provided' }}</span>
+        </div>
+        <div>
+          <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Current Year</span>
+          <span style="font-size: 14px; font-weight: 500; color: var(--text-primary);">{{ user.year or 'Not Provided' }}</span>
+        </div>
+        <div style="grid-column: span 2;">
+          <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">University / Institution</span>
+          <span style="font-size: 14px; font-weight: 500; color: var(--text-primary);">{{ user.university or 'Not Provided' }}</span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
-<div id="profileModal" class="modal-overlay" style="display:none;">
-  <div class="modal-card">
+<!-- ================= MODALS ================= -->
+
+<!-- 1. Edit Details Modal -->
+<div class="modal" id="editProfileModal">
+  <div class="modal-content">
     <div class="modal-header">
-      <h3>Edit Profile</h3>
-      <button id="closeModal" class="modal-close"><i class="fas fa-times"></i></button>
+      <h3 style="font-size: 16px;">Edit Profile Information</h3>
+      <i class="fas fa-times" style="cursor:pointer" onclick="closeModal('editProfileModal')"></i>
     </div>
-    <form id="profileForm">
-      <div class="form-group">
-        <label class="form-label">Full Name</label>
-        <input id="inputName" type="text" class="form-input" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Email</label>
-        <input id="inputEmail" type="email" class="form-input" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Roll Number</label>
-        <input id="inputRoll" type="text" class="form-input">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Branch</label>
-        <input id="inputBranch" type="text" class="form-input">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Semester</label>
-        <input id="inputSemester" type="text" class="form-input">
-      </div>
-      <div style="display: flex; gap: 10px; margin-top: 18px;">
-        <button type="button" id="cancelProfile" class="btn btn-secondary" style="flex: 1; justify-content: center;">Cancel</button>
-        <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center;">Save Changes</button>
-      </div>
-    </form>
+    <div class="modal-body">
+      <form id="editProfileForm" onsubmit="handleProfileUpdate(event)">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" id="editName" class="form-input" value="{{ user.name }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address *</label>
+          <input type="email" id="editEmail" class="form-input" value="{{ user.email }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          <input type="tel" id="editPhone" class="form-input" value="{{ user.phone or '' }}">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Department / Branch</label>
+            <input type="text" id="editDept" class="form-input" value="{{ user.department or '' }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Year</label>
+            <select id="editYear" class="form-input" style="height: 42px;">
+              <option value="" {% if not user.year %}selected{% endif %}>Select Year</option>
+              <option value="1st Year" {% if user.year == '1st Year' %}selected{% endif %}>1st Year</option>
+              <option value="2nd Year" {% if user.year == '2nd Year' %}selected{% endif %}>2nd Year</option>
+              <option value="3rd Year" {% if user.year == '3rd Year' %}selected{% endif %}>3rd Year</option>
+              <option value="4th Year" {% if user.year == '4th Year' %}selected{% endif %}>4th Year</option>
+              <option value="Postgraduate" {% if user.year == 'Postgraduate' %}selected{% endif %}>Postgraduate</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">University / Institution</label>
+          <input type="text" id="editUni" class="form-input" value="{{ user.university or '' }}">
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('editProfileModal')">Cancel</button>
+      <button class="btn btn-primary" type="submit" form="editProfileForm">Save Changes</button>
+    </div>
   </div>
 </div>
 
-<script>
-const editProfileButton = document.getElementById('editProfileButton');
-const profileModal = document.getElementById('profileModal');
-const closeModal = document.getElementById('closeModal');
-const cancelProfile = document.getElementById('cancelProfile');
-const profileForm = document.getElementById('profileForm');
-
-function openProfileModal() {
-  document.getElementById('inputName').value = document.getElementById('profileName').textContent.trim();
-  document.getElementById('inputEmail').value = document.getElementById('profileEmail').textContent.trim();
-  document.getElementById('inputRoll').value = document.getElementById('profileRoll').textContent.trim() === 'N/A' ? '' : document.getElementById('profileRoll').textContent.trim();
-  document.getElementById('inputBranch').value = document.getElementById('profileBranch').textContent.trim() === 'N/A' ? '' : document.getElementById('profileBranch').textContent.trim();
-  document.getElementById('inputSemester').value = document.getElementById('profileSemester').textContent.trim() === 'N/A' ? '' : document.getElementById('profileSemester').textContent.trim();
-  profileModal.style.display = 'flex';
-}
-
-function closeProfileModal() {
-  profileModal.style.display = 'none';
-}
-
-editProfileButton.addEventListener('click', openProfileModal);
-closeModal.addEventListener('click', closeProfileModal);
-cancelProfile.addEventListener('click', closeProfileModal);
-profileModal.addEventListener('click', (event) => {
-  if (event.target === profileModal) {
-    closeProfileModal();
-  }
-});
-
-profileForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const payload = {
-    name: document.getElementById('inputName').value.trim(),
-    email: document.getElementById('inputEmail').value.trim(),
-    roll: document.getElementById('inputRoll').value.trim(),
-    branch: document.getElementById('inputBranch').value.trim(),
-    semester: document.getElementById('inputSemester').value.trim(),
-  };
-
-  try {
-    const res = await fetch('/api/profile/update', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to update profile');
-    }
-    document.getElementById('profileName').textContent = data.user.name;
-    document.getElementById('profileEmail').textContent = data.user.email || 'N/A';
-    document.getElementById('profileRoll').textContent = data.user.roll || 'N/A';
-    document.getElementById('profileBranch').textContent = data.user.branch || 'N/A';
-    document.getElementById('profileSemester').textContent = data.user.semester || 'N/A';
-    closeProfileModal();
-    showNotification('Profile updated successfully', 'success');
-  } catch (error) {
-    showNotification(error.message, 'error');
-  }
-});
-</script>
+<!-- 2. Change Password Modal -->
+<div class="modal" id="changePasswordModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 style="font-size: 16px;">Update Account Password</h3>
+      <i class="fas fa-times" style="cursor:pointer" onclick="closeModal('changePasswordModal')"></i>
+    </div>
+    <div class="modal-body">
+      <form id="changePasswordForm" onsubmit="handlePasswordUpdate(event)">
+        <div class="form-group">
+          <label class="form-label">Current Password *</label>
+          <input type="password" id="oldPass" class="form-input" placeholder="••••••••" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password (Min. 6 characters) *</label>
+          <input type="password" id="newPass" class="form-input" placeholder="••••••••" minlength="6" required>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('changePasswordModal')">Cancel</button>
+      <button class="btn btn-primary" type="submit" form="changePasswordForm">Update Password</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
+{% block extra_scripts %}
+<script>
+  function openModal(id) {
+    document.getElementById(id).style.display = 'flex';
+  }
+  function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  // Handle avatar upload
+  function handleAvatarUpload(input) {
+    if (!input.files || !input.files[0]) return;
+    
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('avatar', file);
+    
+    fetch('/api/profile/avatar', {
+      method: 'POST',
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        showNotification('Profile avatar updated.', 'success');
+        
+        // Update previews
+        const container = document.getElementById('avatarPreviewContainer');
+        container.innerHTML = `
+          <img src="${data.avatar_url}" alt="Avatar" id="avatarImage" style="width: 100%; height: 100%; object-fit: cover;">
+          <div class="avatar-overlay" onclick="document.getElementById('avatarFileInput').click()">
+            <i class="fas fa-camera"></i> Change
+          </div>
+        `;
+        
+        // Update nav header avatar
+        const navAvatar = document.querySelector('.user-avatar');
+        if (navAvatar) {
+          navAvatar.outerHTML = `<img src="${data.avatar_url}" class="user-avatar" style="width:38px; height:38px; object-fit:cover; border-radius:50%; border:2px solid var(--border-color)">`;
+        }
+      } else {
+        showNotification(data.error || 'Failed to upload avatar.', 'danger');
+      }
+    })
+    .catch(err => {
+      showNotification('Communication error: ' + err.message, 'danger');
+    });
+  }
+
+  // Handle personal info updates
+  function handleProfileUpdate(e) {
+    e.preventDefault();
+    const payload = {
+      name: document.getElementById('editName').value,
+      email: document.getElementById('editEmail').value,
+      phone: document.getElementById('editPhone').value,
+      department: document.getElementById('editDept').value,
+      year: document.getElementById('editYear').value,
+      university: document.getElementById('editUni').value
+    };
+    
+    fetch('/api/profile/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        closeModal('editProfileModal');
+        showNotification('Profile updated successfully! Reloading...', 'success');
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        showNotification(data.error || 'Failed to update profile.', 'danger');
+      }
+    });
+  }
+
+  // Handle password updates
+  function handlePasswordUpdate(e) {
+    e.preventDefault();
+    const payload = {
+      old_password: document.getElementById('oldPass').value,
+      new_password: document.getElementById('newPass').value
+    };
+    
+    fetch('/api/profile/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        closeModal('changePasswordModal');
+        document.getElementById('changePasswordForm').reset();
+        showNotification('Password updated successfully.', 'success');
+      } else {
+        showNotification(data.error || 'Failed to update password.', 'danger');
+      }
+    });
+  }
+
+  // Handle Account Deletion
+  function confirmDeleteAccount() {
+    if (confirm('CRITICAL WARNING: Are you absolutely sure you want to permanently delete your account? This action is irreversible, and all uploaded PDFs, resume documents, and chat records will be purged immediately.')) {
+      fetch('/api/profile/delete', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          alert('Your account has been deleted.');
+          window.location.href = '/login';
+        } else {
+          showNotification('Error deleting account.', 'danger');
+        }
+      });
+    }
+  }
+</script>
+{% endblock %}

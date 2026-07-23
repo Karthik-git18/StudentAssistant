@@ -3,61 +3,129 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Student Assistant - Register</title>
+  <title>Student AI - Register</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    body {
+      background: linear-gradient(135deg, #0B0F19 0%, #1E1B4B 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+    }
+    .auth-card {
+      background: rgba(31, 41, 55, 0.6);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+      color: #F9FAFB;
+      max-width: 600px;
+    }
+    .form-input {
+      background-color: rgba(17, 24, 39, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: white;
+    }
+    .form-input:focus {
+      border-color: #6366F1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+    }
+    .logo i {
+      color: #6366F1;
+    }
+  </style>
 </head>
-<body style="background: linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 100%);">
-  <div class="auth-page">
-    <div class="auth-card">
+<body>
+  <div class="auth-page" style="width: 100%;">
+    <div class="auth-card" style="width: 100%;">
       <div class="auth-header">
         <div class="logo" style="justify-content: center; margin-bottom: 16px;">
-          <i class="fas fa-brain"></i> Student AI
+          <i class="fas fa-brain"></i>
+          <span style="font-size: 24px; font-weight: 700; font-family: var(--font-display);">Student AI</span>
         </div>
         <h1 class="auth-title">Create Account</h1>
-        <p class="auth-subtitle">Join Student Assistant today</p>
+        <p class="auth-subtitle">Join the commercial-grade AI student workspace</p>
       </div>
 
       <form method="post" action="/register" class="auth-form">
-        <div class="form-group">
-          <label class="form-label">Full Name</label>
-          <input type="text" name="name" class="form-input" placeholder="John Doe" required>
+        <!-- Section 1: Credentials -->
+        <h3 style="color: #F3F4F6; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-display);">1. Account Credentials</h3>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" style="color: #D1D5DB;">Full Name *</label>
+            <input type="text" name="name" class="form-input" placeholder="Karthik Palepu" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="color: #D1D5DB;">Email Address *</label>
+            <input type="email" name="email" class="form-input" placeholder="karthik@example.com" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" style="color: #D1D5DB;">Password (Min. 6 chars) *</label>
+            <input type="password" name="password" class="form-input" placeholder="••••••••" minlength="6" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="color: #D1D5DB;">Phone Number</label>
+            <input type="tel" name="phone" class="form-input" placeholder="+91 98765 43210">
+          </div>
+        </div>
+
+        <!-- Section 2: Academic Info -->
+        <h3 style="color: #F3F4F6; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 10px; font-family: var(--font-display);">2. Academic Profile</h3>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" style="color: #D1D5DB;">University / College</label>
+            <input type="text" name="university" class="form-input" placeholder="E.g. IIT Madras">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="color: #D1D5DB;">Department / Branch</label>
+            <input type="text" name="department" class="form-input" placeholder="E.g. Computer Science">
+          </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Email</label>
-          <input type="email" name="email" class="form-input" placeholder="you@example.com" required>
+          <label class="form-label" style="color: #D1D5DB;">Year of Study</label>
+          <select name="year" class="form-input" style="height: 42px;">
+            <option value="">Select Year</option>
+            <option value="1st Year">1st Year</option>
+            <option value="2nd Year">2nd Year</option>
+            <option value="3rd Year">3rd Year</option>
+            <option value="4th Year">4th Year</option>
+            <option value="Postgraduate">Postgraduate</option>
+          </select>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Password</label>
-          <input type="password" name="password" class="form-input" placeholder="••••••••" required>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Roll Number</label>
-          <input type="text" name="roll" class="form-input" placeholder="e.g., 23BCS001">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Branch</label>
-          <input type="text" name="branch" class="form-input" placeholder="e.g., Computer Science">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Semester</label>
-          <input type="text" name="semester" class="form-input" placeholder="e.g., 6">
-        </div>
-
-        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
-          Create Account
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 10px;">
+          Create Student Account
         </button>
       </form>
 
       <div class="auth-link">
-        Already have an account? <a href="/login">Sign in</a>
+        Already have an account? <a href="/login" style="color: #818CF8; font-weight: 500;">Sign in here</a>
       </div>
     </div>
+  </div>
+
+  <!-- Notifications -->
+  <div id="toastContainer" class="notification-container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+          {% set toast_type = 'success' if cat == 'success' else 'danger' if cat == 'danger' else 'info' %}
+          <div class="notification {{ toast_type }}">
+            <i class="fas fa-{{ 'check-circle' if toast_type == 'success' else 'exclamation-circle' if toast_type == 'danger' else 'info-circle' }}"></i>
+            <span style="flex:1">{{ msg }}</span>
+            <i class="fas fa-times" style="font-size:12px; cursor:pointer" onclick="this.parentElement.remove()"></i>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
   </div>
 </body>
 </html>

@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block section_title %}System Logs{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Security & Audit Trails</h1>
+    <p style="color: var(--text-muted); font-size: 14px;">Review system access, document ingestion processes, and artificial intelligence token generations.</p>
+  </div>
+</div>
+
+<div class="admin-table-container">
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>User Identity</th>
+        <th>Action Event</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if logs %}
+        {% for log in logs %}
+          <tr>
+            <td><strong>{{ log.created_at }}</strong></td>
+            <td>
+              {% if log.user_name %}
+                <div style="font-weight: 600; color: var(--text-primary);">{{ log.user_name }}</div>
+                <div style="font-size: 11px; color: var(--text-muted);">{{ log.user_email }} • 
+                  {% if log.user_role == 'admin' %}
+                    <span style="color: var(--warning)">Admin</span>
+                  {% else %}
+                    <span style="color: var(--accent-primary)">Student</span>
+                  {% endif %}
+                </div>
+              {% else %}
+                <span style="color: var(--text-muted)">Unauthenticated / System</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if log.action == 'login' %}
+                <span class="badge badge-active" style="background-color: var(--success-light); color: var(--success);"><i class="fas fa-sign-in-alt"></i> Login</span>
+              {% elif log.action == 'pdf_upload' %}
+                <span class="badge" style="background-color: rgba(239, 68, 68, 0.15); color: #EF4444;"><i class="fas fa-file-pdf"></i> Upload</span>
+              {% elif log.action.startswith('ai_') %}
+                <span class="badge" style="background-color: rgba(139, 92, 246, 0.15); color: #8B5CF6;"><i class="fas fa-robot"></i> AI Gen</span>
+              {% else %}
+                <span class="badge" style="background-color: var(--border-color); color: var(--text-secondary);">{{ log.action }}</span>
+              {% endif %}
+            </td>
+            <td><code style="font-size:12px; color: var(--text-secondary)">{{ log.details or 'None' }}</code></td>
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="4" style="text-align: center; padding: 40px; color: var(--text-muted);">
+            <i class="fas fa-clipboard-list" style="font-size:36px; margin-bottom:12px; display:block"></i>
+            No audit log entries recorded.
+          </td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

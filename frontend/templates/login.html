@@ -3,41 +3,86 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Student Assistant - Login</title>
+  <title>Student AI - Login</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    body {
+      background: linear-gradient(135deg, #0B0F19 0%, #1E1B4B 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .auth-card {
+      background: rgba(31, 41, 55, 0.6);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+      color: #F9FAFB;
+    }
+    .form-input {
+      background-color: rgba(17, 24, 39, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: white;
+    }
+    .form-input:focus {
+      border-color: #6366F1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+    }
+    .logo i {
+      color: #6366F1;
+    }
+  </style>
 </head>
-<body style="background: linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 100%);">
+<body>
   <div class="auth-page">
     <div class="auth-card">
       <div class="auth-header">
         <div class="logo" style="justify-content: center; margin-bottom: 16px;">
-          <i class="fas fa-brain"></i> Student AI
+          <i class="fas fa-brain"></i>
+          <span style="font-size: 24px; font-weight: 700; font-family: var(--font-display);">Student AI</span>
         </div>
         <h1 class="auth-title">Welcome Back</h1>
-        <p class="auth-subtitle">Sign in to your account</p>
+        <p class="auth-subtitle">Sign in to access your student workspace</p>
       </div>
 
       <form method="post" action="/login" class="auth-form">
         <div class="form-group">
-          <label class="form-label">Email</label>
-          <input type="email" name="email" class="form-input" placeholder="you@example.com" required>
+          <label class="form-label" style="color: #D1D5DB;">Email Address</label>
+          <input type="email" name="email" class="form-input" placeholder="you@example.com" required autocomplete="email">
         </div>
 
         <div class="form-group">
-          <label class="form-label">Password</label>
-          <input type="password" name="password" class="form-input" placeholder="••••••••" required>
+          <label class="form-label" style="color: #D1D5DB;">Password</label>
+          <input type="password" name="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px;">
           Sign In
         </button>
       </form>
 
       <div class="auth-link">
-        Don't have an account? <a href="/register">Create one</a>
+        Don't have an account? <a href="/register" style="color: #818CF8; font-weight: 500;">Create account</a>
       </div>
     </div>
+  </div>
+
+  <!-- Notification setup -->
+  <div id="toastContainer" class="notification-container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+          {% set toast_type = 'success' if cat == 'success' else 'danger' if cat == 'danger' else 'info' %}
+          <div class="notification {{ toast_type }}">
+            <i class="fas fa-{{ 'check-circle' if toast_type == 'success' else 'exclamation-circle' if toast_type == 'danger' else 'info-circle' }}"></i>
+            <span style="flex:1">{{ msg }}</span>
+            <i class="fas fa-times" style="font-size:12px; cursor:pointer" onclick="this.parentElement.remove()"></i>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
   </div>
 </body>
 </html>

@@ -1,0 +1,379 @@
+{% extends 'base.html' %}
+{% block section_title %}Manage Students{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Student Records Registry</h1>
+    <p style="color: var(--text-muted); font-size: 14px;">Monitor profiles, edit details, restrict access, view PDF uploads, or permanently delete students.</p>
+  </div>
+</div>
+
+<!-- Search Bar -->
+<div class="card" style="margin-bottom: 24px; padding: 16px;">
+  <form method="get" action="/admin/students" style="display: flex; gap: 12px;">
+    <input type="text" name="search" class="form-input" placeholder="Search by name or email..." value="{{ search_q or '' }}">
+    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
+    {% if search_q %}
+      <a href="/admin/students" class="btn btn-secondary"><i class="fas fa-times"></i> Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Students Table -->
+<div class="admin-table-container">
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>Student Name</th>
+        <th>Email Address</th>
+        <th>University</th>
+        <th>Department & Year</th>
+        <th>Status</th>
+        <th>Last Login</th>
+        <th style="min-width:210px;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if students %}
+        {% for student in students %}
+          <tr id="student-row-{{ student.id }}">
+            <td>
+              <div style="font-weight:600; color:var(--text-primary);">{{ student.name }}</div>
+              <div style="font-size:11px; color:var(--text-muted);">Joined: {{ student.created_at[:10] if student.created_at else 'N/A' }}</div>
+            </td>
+            <td>{{ student.email }}</td>
+            <td>{{ student.university or 'N/A' }}</td>
+            <td>
+              <div>{{ student.department or 'N/A' }}</div>
+              <div style="font-size:11px; color:var(--text-muted);">{{ student.year or 'N/A' }}</div>
+            </td>
+            <td>
+              {% if student.status == 'active' %}
+                <span class="badge badge-active" id="status-badge-{{ student.id }}">Active</span>
+              {% else %}
+                <span class="badge badge-disabled" id="status-badge-{{ student.id }}">Disabled</span>
+              {% endif %}
+            </td>
+            <td style="font-size:12px; color:var(--text-muted);">{{ student.last_login or 'Never' }}</td>
+            <td>
+              <div class="actions-cell" style="flex-wrap:wrap; gap:6px;">
+                <!-- View Uploads -->
+                <button class="btn btn-secondary btn-icon"
+                  onclick="openUploadsModal({{ student.id }}, '{{ student.name | e }}')"
+                  title="View PDF Uploads" style="color:var(--primary);">
+                  <i class="fas fa-file-pdf"></i>
+                </button>
+                <!-- Status Toggle -->
+                {% if student.status == 'active' %}
+                  <button class="btn btn-secondary btn-icon" id="toggle-btn-{{ student.id }}"
+                    onclick="toggleStudentAccess({{ student.id }}, 'disabled')"
+                    title="Disable Account" style="color:var(--warning);">
+                    <i class="fas fa-user-slash"></i>
+                  </button>
+                {% else %}
+                  <button class="btn btn-secondary btn-icon" id="toggle-btn-{{ student.id }}"
+                    onclick="toggleStudentAccess({{ student.id }}, 'active')"
+                    title="Enable Account" style="color:var(--success);">
+                    <i class="fas fa-user-check"></i>
+                  </button>
+                {% endif %}
+                <!-- Edit -->
+                <button class="btn btn-secondary btn-icon"
+                  onclick="openEditStudentModal({{ student | tojson | forceescape }})"
+                  title="Edit Details">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <!-- Delete -->
+                <button class="btn btn-secondary btn-icon"
+                  onclick="handleStudentDelete({{ student.id }}, '{{ student.name | e }}')"
+                  title="Delete Student" style="color:var(--danger);">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">
+            <i class="fas fa-users" style="font-size:36px; margin-bottom:12px; display:block"></i>
+            No student accounts found.
+          </td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ══ EDIT STUDENT MODAL ══════════════════════════════════════════════════ -->
+<div class="modal" id="editStudentModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3><i class="fas fa-user-edit" style="margin-right:8px;color:var(--primary)"></i>Edit Student Details</h3>
+      <i class="fas fa-times" style="cursor:pointer" onclick="closeModal('editStudentModal')"></i>
+    </div>
+    <div class="modal-body">
+      <form id="editStudentForm" onsubmit="submitEditStudent(event)">
+        <input type="hidden" id="editStudentId">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" id="editStudentName" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address *</label>
+          <input type="email" id="editStudentEmail" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          <input type="tel" id="editStudentPhone" class="form-input">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Department</label>
+            <input type="text" id="editStudentDept" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Year</label>
+            <select id="editStudentYear" class="form-input" style="height:42px;">
+              <option value="">Select Year</option>
+              <option value="1st Year">1st Year</option>
+              <option value="2nd Year">2nd Year</option>
+              <option value="3rd Year">3rd Year</option>
+              <option value="4th Year">4th Year</option>
+              <option value="Postgraduate">Postgraduate</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">University / Institution</label>
+          <input type="text" id="editStudentUni" class="form-input">
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('editStudentModal')">Cancel</button>
+      <button class="btn btn-primary" type="submit" form="editStudentForm">
+        <i class="fas fa-save" style="margin-right:6px"></i>Save Details
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ STUDENT UPLOADS MODAL ══════════════════════════════════════════════ -->
+<div class="modal" id="studentUploadsModal">
+  <div class="modal-content" style="max-width:720px; width:95%;">
+    <div class="modal-header">
+      <h3>
+        <i class="fas fa-folder-open" style="margin-right:8px;color:var(--primary)"></i>
+        <span id="uploadsModalTitle">Student PDF Uploads</span>
+      </h3>
+      <i class="fas fa-times" style="cursor:pointer" onclick="closeModal('studentUploadsModal')"></i>
+    </div>
+    <div class="modal-body" style="padding:0; max-height:65vh; overflow-y:auto;">
+      <div id="uploadsModalBody" style="padding:24px; min-height:120px;">
+        <div style="text-align:center; color:var(--text-muted); padding:40px;">
+          <i class="fas fa-spinner fa-spin" style="font-size:24px; margin-bottom:12px; display:block"></i>
+          Loading uploads...
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('studentUploadsModal')">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // ── HELPERS ────────────────────────────────────────────────────────────────
+  function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  // ── EDIT STUDENT ───────────────────────────────────────────────────────────
+  function openEditStudentModal(student) {
+    document.getElementById('editStudentId').value    = student.id;
+    document.getElementById('editStudentName').value  = student.name;
+    document.getElementById('editStudentEmail').value = student.email;
+    document.getElementById('editStudentPhone').value = student.phone        || '';
+    document.getElementById('editStudentDept').value  = student.department   || '';
+    document.getElementById('editStudentYear').value  = student.year         || '';
+    document.getElementById('editStudentUni').value   = student.university   || '';
+    document.getElementById('editStudentModal').style.display = 'flex';
+  }
+
+  function submitEditStudent(e) {
+    e.preventDefault();
+    const id = document.getElementById('editStudentId').value;
+    const payload = {
+      name:       document.getElementById('editStudentName').value,
+      email:      document.getElementById('editStudentEmail').value,
+      phone:      document.getElementById('editStudentPhone').value,
+      department: document.getElementById('editStudentDept').value,
+      year:       document.getElementById('editStudentYear').value,
+      university: document.getElementById('editStudentUni').value
+    };
+    fetch(`/api/admin/students/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        closeModal('editStudentModal');
+        showNotification('Student updated successfully.', 'success');
+        setTimeout(() => location.reload(), 1200);
+      } else {
+        showNotification(data.message || 'Update failed.', 'danger');
+      }
+    });
+  }
+
+  // ── STATUS TOGGLE ──────────────────────────────────────────────────────────
+  function toggleStudentAccess(id, targetStatus) {
+    fetch(`/api/admin/students/${id}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: targetStatus })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        showNotification(data.message, 'success');
+        const badge = document.getElementById(`status-badge-${id}`);
+        const btn   = document.getElementById(`toggle-btn-${id}`);
+        if (targetStatus === 'active') {
+          badge.className   = 'badge badge-active';
+          badge.textContent = 'Active';
+          btn.style.color   = 'var(--warning)';
+          btn.innerHTML     = '<i class="fas fa-user-slash"></i>';
+          btn.title         = 'Disable Account';
+          btn.onclick       = () => toggleStudentAccess(id, 'disabled');
+        } else {
+          badge.className   = 'badge badge-disabled';
+          badge.textContent = 'Disabled';
+          btn.style.color   = 'var(--success)';
+          btn.innerHTML     = '<i class="fas fa-user-check"></i>';
+          btn.title         = 'Enable Account';
+          btn.onclick       = () => toggleStudentAccess(id, 'active');
+        }
+      } else {
+        showNotification(data.message || 'Toggle failed.', 'danger');
+      }
+    });
+  }
+
+  // ── DELETE STUDENT ─────────────────────────────────────────────────────────
+  function handleStudentDelete(id, name) {
+    if (confirm(`PERMANENT DELETE\n\nDelete "${name}" and ALL their PDFs, RAG indexes, and chat history?\n\nThis cannot be undone.`)) {
+      fetch(`/api/admin/students/${id}`, { method: 'DELETE' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          showNotification('Student permanently deleted.', 'success');
+          document.getElementById(`student-row-${id}`).remove();
+        } else {
+          showNotification(data.message || 'Delete failed.', 'danger');
+        }
+      });
+    }
+  }
+
+  // ── STUDENT UPLOADS MODAL ──────────────────────────────────────────────────
+  function openUploadsModal(studentId, studentName) {
+    document.getElementById('uploadsModalTitle').textContent = `${studentName} — PDF Uploads`;
+    document.getElementById('uploadsModalBody').innerHTML = `
+      <div style="text-align:center;color:var(--text-muted);padding:48px;">
+        <i class="fas fa-spinner fa-spin" style="font-size:28px;margin-bottom:12px;display:block"></i>
+        Loading documents...
+      </div>`;
+    document.getElementById('studentUploadsModal').style.display = 'flex';
+
+    fetch(`/api/admin/students/${studentId}/uploads`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) renderUploadsTable(data.uploads);
+      else document.getElementById('uploadsModalBody').innerHTML =
+        `<p style="padding:24px;color:var(--danger);">Failed to load uploads.</p>`;
+    });
+  }
+
+  function renderUploadsTable(uploads) {
+    const body = document.getElementById('uploadsModalBody');
+    if (!uploads || uploads.length === 0) {
+      body.innerHTML = `
+        <div style="text-align:center;padding:56px;color:var(--text-muted);">
+          <i class="fas fa-folder-open" style="font-size:44px;margin-bottom:14px;display:block;opacity:.35;"></i>
+          <p style="font-size:14px;">This student has not uploaded any PDF documents.</p>
+        </div>`;
+      return;
+    }
+
+    let rows = uploads.map(doc => {
+      const date = doc.created_at ? doc.created_at.slice(0,16) : 'N/A';
+      const name = doc.filename.replace(/'/g, "\\'");
+      return `
+        <tr id="upload-row-${doc.id}" style="border-bottom:1px solid var(--border-color);">
+          <td style="padding:10px 14px;color:var(--text-muted);font-size:12px;">#${doc.id}</td>
+          <td style="padding:10px 14px;">
+            <i class="fas fa-file-pdf" style="color:#EF4444;margin-right:8px;"></i>
+            <span style="font-weight:500;color:var(--text-primary);">${doc.filename}</span>
+          </td>
+          <td style="padding:10px 14px;color:var(--text-muted);font-size:12px;">${doc.pages || '—'} pages</td>
+          <td style="padding:10px 14px;color:var(--text-muted);font-size:12px;">${date}</td>
+          <td style="padding:10px 14px;text-align:center;">
+            <div style="display:flex;gap:6px;justify-content:center;">
+              <a href="/api/admin/documents/${doc.id}/view" target="_blank"
+                 class="btn btn-secondary btn-icon" title="View PDF in new tab" style="color:var(--primary);">
+                <i class="fas fa-eye"></i>
+              </a>
+              <button class="btn btn-secondary btn-icon"
+                onclick="adminDeleteUpload(${doc.id},'${name}')"
+                title="Delete PDF" style="color:var(--danger);">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
+
+    body.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--bg-secondary);border-bottom:2px solid var(--border-color);">
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--text-muted);">ID</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;">File Name</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;">Pages</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;">Uploaded</th>
+            <th style="padding:10px 14px;text-align:center;font-weight:600;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  function adminDeleteUpload(docId, filename) {
+    if (confirm(`Delete "${filename}"?\n\nThis permanently removes the PDF and its search index.`)) {
+      fetch(`/api/admin/documents/${docId}`, { method: 'DELETE' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          showNotification('Document deleted.', 'success');
+          const row = document.getElementById(`upload-row-${docId}`);
+          if (row) {
+            row.remove();
+            // Show empty state if no rows remain
+            const remaining = document.querySelectorAll('#uploadsModalBody tbody tr');
+            if (remaining.length === 0) renderUploadsTable([]);
+          }
+        } else {
+          showNotification(data.message || 'Delete failed.', 'danger');
+        }
+      });
+    }
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% block section_title %}Workspace Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">SaaS Metrics & Analytics</h1>
+    <p style="color: var(--text-muted); font-size: 14px;">Understand registration velocities, active daily usage, and identifying high-volume users.</p>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 24px;">
+  <!-- Registrations Chart -->
+  <div class="card">
+    <h3 class="card-title" style="margin-bottom: 16px;">Student Registration Growth (Last 7 Days)</h3>
+    <div style="position: relative; height: 260px;">
+      <canvas id="registrationsChart"></canvas>
+    </div>
+  </div>
+
+  <!-- AI Usage Chart -->
+  <div class="card">
+    <h3 class="card-title" style="margin-bottom: 16px;">Daily AI Requests Volume (Last 7 Days)</h3>
+    <div style="position: relative; height: 260px;">
+      <canvas id="aiUsageChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Most Active Students Table -->
+<div class="card">
+  <h3 class="card-title" style="margin-bottom: 16px;">Top 5 Most Active Students</h3>
+  <div class="admin-table-container" style="margin-top: 12px; border:none; box-shadow:none;">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Student Name</th>
+          <th>Email Address</th>
+          <th>Total Activity Count</th>
+        </tr>
+      </thead>
+      <tbody id="activeStudentsTableBody">
+        <tr>
+          <td colspan="3" style="text-align:center; padding:20px; color:var(--text-muted)">
+            <div class="loading-spinner" style="margin: 0 auto 12px;"></div>
+            Loading active student metrics...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    fetch('/api/admin/analytics/data')
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        renderAnalyticsCharts(data.analytics);
+      }
+    });
+  });
+
+  function renderAnalyticsCharts(analytics) {
+    const isDark = document.documentElement.classList.contains('dark-mode');
+    const textColor = isDark ? '#94A3B8' : '#64748B';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+
+    // 1. Registrations Chart
+    const regDates = analytics.registrations.map(r => r.date_val);
+    const regCounts = analytics.registrations.map(r => r.count);
+    
+    new Chart(document.getElementById('registrationsChart'), {
+      type: 'bar',
+      data: {
+        labels: regDates.length > 0 ? regDates : ['None'],
+        datasets: [{
+          label: 'Registrations',
+          data: regCounts.length > 0 ? regCounts : [0],
+          backgroundColor: '#6366F1',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: textColor } }
+        },
+        scales: {
+          x: { ticks: { color: textColor }, grid: { display: false } },
+          y: { ticks: { color: textColor, stepSize: 1 }, grid: { color: gridColor } }
+        }
+      }
+    });
+
+    // 2. AI Usage Chart
+    const aiDates = analytics.daily_ai_requests.map(a => a.date_val);
+    const aiCounts = analytics.daily_ai_requests.map(a => a.count);
+    
+    new Chart(document.getElementById('aiUsageChart'), {
+      type: 'line',
+      data: {
+        labels: aiDates.length > 0 ? aiDates : ['None'],
+        datasets: [{
+          label: 'AI Calls Count',
+          data: aiCounts.length > 0 ? aiCounts : [0],
+          borderColor: '#10B981',
+          backgroundColor: 'rgba(16, 185, 129, 0.08)',
+          tension: 0.35,
+          fill: true,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: textColor } }
+        },
+        scales: {
+          x: { ticks: { color: textColor }, grid: { display: false } },
+          y: { ticks: { color: textColor, stepSize: 5 }, grid: { color: gridColor } }
+        }
+      }
+    });
+
+    // 3. Populate Active Students table
+    const tableBody = document.getElementById('activeStudentsTableBody');
+    if (analytics.active_students.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No student logs found.</td></tr>`;
+      return;
+    }
+
+    let html = "";
+    analytics.active_students.forEach(student => {
+      html += `
+        <tr>
+          <td><strong style="color:var(--text-primary)">${student.name}</strong></td>
+          <td>${student.email}</td>
+          <td><span class="badge badge-student" style="font-size:12px">${student.activity_count} actions</span></td>
+        </tr>
+      `;
+    });
+    tableBody.innerHTML = html;
+  }
+</script>
+{% endblock %}

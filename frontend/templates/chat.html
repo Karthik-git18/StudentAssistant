@@ -1,121 +1,493 @@
 {% extends 'base.html' %}
-{% block content %}
-<div class="page-title">AI Chat</div>
+{% block section_title %}AI Chat Workspace{% endblock %}
 
-<div class="split-layout">
-  <!-- Chat Sidebar -->
-  <div class="card" style="max-height: 600px;">
-    <h3 style="margin-bottom: 16px; font-family: 'Poppins', sans-serif; font-size: 16px; font-weight: 600;">Chats</h3>
-    <button class="btn btn-secondary" style="width: 100%; justify-content: center; margin-bottom: 12px;">
-      <i class="fas fa-plus"></i> New Chat
-    </button>
-    <div id="chatHistory" style="max-height: 400px; overflow-y: auto;">
-      <div style="padding: 12px; text-align: center; color: var(--muted); font-size: 13px;">
-        Start a new conversation
+{% block content %}
+<div class="chat-layout">
+  <!-- Sidebar Panel: History Sessions -->
+  <div class="chat-sidebar">
+    <div style="padding: 16px; border-bottom: 1px solid var(--border-color);">
+      <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="startNewSession()">
+        <i class="fas fa-plus"></i> New Chat
+      </button>
+    </div>
+    <div class="chat-history-list" id="chatSessionList">
+      <!-- Populated dynamically via JS -->
+      <div style="text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 20px;">
+        No recent chat history.
       </div>
     </div>
   </div>
 
-  <!-- Main Chat -->
-  <div style="display: flex; flex-direction: column; height: 600px;">
-    <div id="chatMessages" class="messages" style="flex: 1;"></div>
-    
-    <div class="composer">
-      <input id="chatInput" class="composer-input" placeholder="Ask anything..." style="padding: 12px; height: 44px;">
-      <button id="chatSend" class="btn btn-primary" style="height: 44px;">
-        <i class="fas fa-paper-plane"></i>
-      </button>
+  <!-- Main Panel: Conversations -->
+  <div class="chat-main">
+    <!-- Messages Container -->
+    <div class="chat-messages" id="chatMessagesViewport">
+      <!-- Initial Empty State -->
+      <div id="chatEmptyState" style="margin: auto; display: flex; flex-direction: column; align-items: center; max-width: 600px; text-align: center; padding: 24px;">
+        <i class="fas fa-robot" style="font-size: 48px; color: var(--accent-primary); margin-bottom: 20px;"></i>
+        <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 8px;">Ask Student AI Anything</h2>
+        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">Interact with your coding assistant, ask conceptual queries, or optimize project designs.</p>
+        
+        <div class="suggested-prompts-grid">
+          <div class="suggested-prompt-card" onclick="clickSuggestedPrompt('Explain the difference between SQL and NoSQL databases.')">
+            <strong>SQL vs NoSQL</strong>
+            <p style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">Compare database paradigms.</p>
+          </div>
+          <div class="suggested-prompt-card" onclick="clickSuggestedPrompt('Write a clean Python function for binary search with comments.')">
+            <strong>Binary Search algorithm</strong>
+            <p style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">Get coding assistance.</p>
+          </div>
+          <div class="suggested-prompt-card" onclick="clickSuggestedPrompt('What is the role of Flask blueprints in large applications?')">
+            <strong>Flask Blueprints</strong>
+            <p style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">Understand project architecture.</p>
+          </div>
+          <div class="suggested-prompt-card" onclick="clickSuggestedPrompt('Explain how neural networks adjust weights using backpropagation.')">
+            <strong>Backpropagation</strong>
+            <p style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">Understand Deep Learning.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Box -->
+    <div class="chat-input-area">
+      <div class="chat-input-box">
+        <textarea id="chatMessageInput" rows="1" placeholder="Send a message to Student AI..." onkeydown="handleInputKey(event)"></textarea>
+        <button class="chat-send-btn" id="sendBtn" onclick="submitChatMessage()"><i class="fas fa-paper-plane"></i></button>
+      </div>
+      <p style="text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 8px;">Student AI can make mistakes. Verify important academic facts.</p>
     </div>
   </div>
 </div>
+{% endblock %}
 
+{% block extra_scripts %}
 <script>
-(() => {
-  'use strict';
+  let currentSessionId = null;
+  let currentSessionTitle = "";
+  let isGenerating = false;
 
-  // url_for keeps this URL correct if the application is mounted under a prefix.
-  const chatApiUrl = {{ url_for('chat.chat_api')|tojson }};
-  const chatInput = document.getElementById('chatInput');
-  const chatSend = document.getElementById('chatSend');
-  const chatMessages = document.getElementById('chatMessages');
-
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = String(text);
-    return div.innerHTML;
-  }
-
-  function addMessage(message, role = 'bot') {
-    const messageElement = document.createElement('div');
-    messageElement.className = role === 'user' ? 'message user' : 'message';
-    messageElement.innerHTML = `<div class="bubble ${role}">${escapeHtml(message)}</div>`;
-    chatMessages.appendChild(messageElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    return messageElement;
-  }
-
-  async function readJsonResponse(response) {
-    const responseText = await response.text();
-    try {
-      return responseText ? JSON.parse(responseText) : {};
-    } catch (_) {
-      throw new Error(`The server returned ${response.status}, but not JSON: ${responseText.slice(0, 160) || 'empty response'}`);
-    }
-  }
-
-  async function sendMessage() {
-    const message = chatInput.value.trim();
-    if (!message || chatSend.disabled) return;
-
-    addMessage(message, 'user');
-    chatInput.value = '';
-    chatInput.disabled = true;
-    chatSend.disabled = true;
-
-    const typingMessage = addMessage('Thinking…');
-    typingMessage.querySelector('.bubble').innerHTML = '<span class="spinner" style="width: 12px; height: 12px;"></span>';
-
-    try {
-      console.info('Sending chat request to', chatApiUrl);
-      const response = await fetch(chatApiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ message }),
-        credentials: 'same-origin'
-      });
-      const data = await readJsonResponse(response);
-
-      if (!response.ok) {
-        throw new Error(data.error || `Request failed with HTTP ${response.status}`);
-      }
-      if (!data.answer) {
-        throw new Error(data.error || 'The server returned no answer.');
-      }
-
-      typingMessage.remove();
-      addMessage(data.answer);
-    } catch (error) {
-      console.error('Chat request failed.', { endpoint: chatApiUrl, error });
-      const detail = error instanceof Error ? error.message : String(error);
-      typingMessage.querySelector('.bubble').textContent = `Chat error: ${detail} (endpoint: ${chatApiUrl})`;
-      typingMessage.querySelector('.bubble').style.color = 'var(--muted)';
-    } finally {
-      chatInput.disabled = false;
-      chatSend.disabled = false;
-      chatInput.focus();
-    }
-  }
-
-  chatInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      sendMessage();
-    }
+  document.addEventListener('DOMContentLoaded', () => {
+    loadChatSessions();
+    
+    // Auto-adjust input textarea height
+    const txtArea = document.getElementById('chatMessageInput');
+    txtArea.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = (this.scrollHeight) + 'px';
+    });
   });
-  chatSend.addEventListener('click', sendMessage);
 
-  window.addEventListener('error', (event) => console.error('Chat page JavaScript error:', event.error || event.message));
-  window.addEventListener('unhandledrejection', (event) => console.error('Unhandled chat page promise rejection:', event.reason));
-})();
+  // Client-side Markdown rendering with code blocks & copy buttons
+  function renderMarkdown(text) {
+    if (!text) return "";
+    let html = text;
+    
+    // Escaping HTML elements except markdown codes
+    html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    
+    // Code blocks with syntax copy buttons
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+      const uniqueId = 'code-' + Math.floor(Math.random()*100000);
+      return `
+        <div class="code-container" style="position:relative; margin:16px 0;">
+          <div style="background-color:#0F172A; color:#94A3B8; padding:6px 16px; font-size:11px; font-weight:600; display:flex; justify-content:between; border-top-left-radius:6px; border-top-right-radius:6px; border-bottom:1px solid #1E293B">
+            <span>${lang.toUpperCase() || 'CODE'}</span>
+            <button onclick="copyCodeText('${uniqueId}')" style="background:none; border:none; color:#94A3B8; cursor:pointer; font-size:11px;"><i class="fas fa-copy"></i> Copy</button>
+          </div>
+          <pre style="margin:0; border-top-left-radius:0; border-top-right-radius:0;"><code id="${uniqueId}">${code.trim()}</code></pre>
+        </div>
+      `;
+    });
+
+    // Inline codes
+    html = html.replace(/`([^`]+)`/g, '<code style="background-color:var(--bg-secondary); padding:2px 6px; border-radius:4px; font-family:monospace; color:var(--accent-primary);">$1</code>');
+
+    // Headings (### title)
+    html = html.replace(/###\s+(.+)/g, '<h3>$1</h3>');
+    html = html.replace(/##\s+(.+)/g, '<h2>$1</h2>');
+    html = html.replace(/#\s+(.+)/g, '<h1>$1</h1>');
+    
+    // Bold (**word**)
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    
+    // Bullet lists
+    html = html.replace(/^\s*[\-\*•]\s+(.+)/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.+?<\/li>)/gs, '<ul style="margin-left:20px; margin-bottom:12px;">$1</ul>');
+    html = html.replace(/<\/ul>\s*<ul>/g, '');
+
+    // Ordered lists
+    html = html.replace(/^\s*\d+[\.\)]\s+(.+)/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.+?<\/li>)/gs, '<ol style="margin-left:20px; margin-bottom:12px;">$1</ol>');
+    html = html.replace(/<\/ol>\s*<ol>/g, '');
+
+    // Paragraph breaks
+    html = html.split('\n\n').map(p => {
+      if (p.trim().startsWith('<h') || p.trim().startsWith('<ul') || p.trim().startsWith('<ol>') || p.trim().startsWith('<div class="code-container"')) {
+        return p;
+      }
+      return `<p style="margin-bottom:12px">${p.replace(/\n/g, '<br>')}</p>`;
+    }).join('');
+
+    return html;
+  }
+
+  function copyCodeText(id) {
+    const code = document.getElementById(id).textContent;
+    navigator.clipboard.writeText(code).then(() => {
+      showNotification('Code copied to clipboard.', 'success');
+    });
+  }
+
+  function loadChatSessions() {
+    fetch('/api/chat/sessions')
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        populateSessionList(data.sessions);
+      }
+    });
+  }
+
+  function populateSessionList(sessions) {
+    const list = document.getElementById('chatSessionList');
+    if (!sessions || sessions.length === 0) {
+      list.innerHTML = `
+        <div style="text-align:center; color:var(--text-muted); font-size:12px; margin-top:20px">
+          No chat history.
+        </div>
+      `;
+      return;
+    }
+
+    let html = "";
+    sessions.forEach(sess => {
+      const activeClass = sess.session_id === currentSessionId ? 'active' : '';
+      html += `
+        <div class="chat-history-item ${activeClass}" id="sess-item-${sess.session_id}" onclick="loadChatHistory('${sess.session_id}', '${escapeQuote(sess.session_title)}')">
+          <div class="chat-title-text" id="title-text-${sess.session_id}">${sess.session_title}</div>
+          <div class="chat-history-actions">
+            <button onclick="event.stopPropagation(); renameSessionPrompt('${sess.session_id}', '${escapeQuote(sess.session_title)}')"><i class="fas fa-edit"></i></button>
+            <button onclick="event.stopPropagation(); deleteSession('${sess.session_id}')" style="color:var(--danger)"><i class="fas fa-trash"></i></button>
+          </div>
+        </div>
+      `;
+    });
+    list.innerHTML = html;
+  }
+
+  function startNewSession() {
+    if (isGenerating) return;
+    currentSessionId = null;
+    currentSessionTitle = "";
+    
+    // Reset view
+    const viewport = document.getElementById('chatMessagesViewport');
+    viewport.innerHTML = `
+      <div id="chatEmptyState" style="margin: auto; display: flex; flex-direction: column; align-items: center; max-width: 600px; text-align: center; padding: 24px;">
+        <i class="fas fa-robot" style="font-size: 48px; color: var(--accent-primary); margin-bottom: 20px;"></i>
+        <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 8px;">Ask Student AI Anything</h2>
+        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">Interact with your coding assistant, ask conceptual queries, or optimize project designs.</p>
+        <div class="suggested-prompts-grid">
+          <div class="suggested-prompt-card" onclick="clickSuggestedPrompt('Explain the difference between SQL and NoSQL databases.')">
+            <strong>SQL vs NoSQL</strong>
+            <p style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">Compare database paradigms.</p>
+          </div>
+          <div class="suggested-prompt-card" onclick="clickSuggestedPrompt('Write a clean Python function for binary search with comments.')">
+            <strong>Binary Search algorithm</strong>
+            <p style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">Get coding assistance.</p>
+          </div>
+          <div class="suggested-prompt-card" onclick="clickSuggestedPrompt('What is the role of Flask blueprints in large applications?')">
+            <strong>Flask Blueprints</strong>
+            <p style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">Understand project architecture.</p>
+          </div>
+          <div class="suggested-prompt-card" onclick="clickSuggestedPrompt('Explain how neural networks adjust weights using backpropagation.')">
+            <strong>Backpropagation</strong>
+            <p style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">Understand Deep Learning.</p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Unselect all items
+    document.querySelectorAll('.chat-history-item').forEach(item => item.classList.remove('active'));
+    showNotification('New conversation thread initialized.', 'info');
+  }
+
+  function loadChatHistory(sessionId, sessionTitle) {
+    if (isGenerating) return;
+    currentSessionId = sessionId;
+    currentSessionTitle = sessionTitle;
+    
+    // Highlight session item
+    document.querySelectorAll('.chat-history-item').forEach(item => item.classList.remove('active'));
+    const item = document.getElementById(`sess-item-${sessionId}`);
+    if (item) item.classList.add('active');
+
+    const viewport = document.getElementById('chatMessagesViewport');
+    viewport.innerHTML = `<div class="empty-state" style="margin:auto"><div class="loading-spinner"></div><p>Retrieving session logs...</p></div>`;
+
+    fetch(`/api/chat/sessions/${sessionId}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        viewport.innerHTML = "";
+        data.history.forEach(msg => {
+          appendMessageUI(msg.role, msg.message);
+        });
+        scrollToBottom();
+      }
+    });
+  }
+
+  function renameSessionPrompt(id, title) {
+    const newTitle = prompt("Enter a new title for this conversation:", title);
+    if (!newTitle || !newTitle.trim()) return;
+    
+    fetch(`/api/chat/sessions/${id}/rename`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle.trim() })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        showNotification('Conversation renamed.', 'success');
+        loadChatSessions();
+        if (id === currentSessionId) {
+          currentSessionTitle = newTitle.trim();
+        }
+      }
+    });
+  }
+
+  function deleteSession(id) {
+    if (confirm("Delete this conversation thread permanently?")) {
+      fetch(`/api/chat/sessions/${id}`, { method: 'DELETE' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          showNotification('Conversation deleted.', 'info');
+          if (id === currentSessionId) {
+            startNewSession();
+          }
+          loadChatSessions();
+        }
+      });
+    }
+  }
+
+  function clickSuggestedPrompt(promptText) {
+    document.getElementById('chatMessageInput').value = promptText;
+    submitChatMessage();
+  }
+
+  function handleInputKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submitChatMessage();
+    }
+  }
+
+  // Handle SSE message stream submission
+  function submitChatMessage() {
+    if (isGenerating) return;
+    const input = document.getElementById('chatMessageInput');
+    const message = input.value.trim();
+    if (!message) return;
+
+    input.value = "";
+    input.style.height = 'auto'; // reset height
+
+    // Clear empty state
+    const emptyState = document.getElementById('chatEmptyState');
+    if (emptyState) emptyState.remove();
+
+    // 1. Append User Message to UI
+    appendMessageUI('user', message);
+    scrollToBottom();
+
+    // 2. Setup Assistant message placeholder in UI
+    const assistantMsgId = 'ai-msg-' + Math.floor(Math.random()*100000);
+    appendAssistantPlaceholderUI(assistantMsgId);
+    scrollToBottom();
+    
+    const bodyContent = document.querySelector(`#${assistantMsgId} .msg-content-text`);
+    const statusText = document.querySelector(`#${assistantMsgId} .typing-indicator`);
+
+    isGenerating = true;
+    document.getElementById('sendBtn').disabled = true;
+
+    // Call stream API using fetch API
+    fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: message,
+        session_id: currentSessionId,
+        session_title: currentSessionTitle
+      })
+    })
+    .then(response => {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let responseBuffer = "";
+
+      function readChunk() {
+        reader.read().then(({ done, value }) => {
+          if (done) {
+            // Streaming finished
+            isGenerating = false;
+            document.getElementById('sendBtn').disabled = false;
+            if (statusText) statusText.remove();
+            
+            // Add message actions (copy response, regenerate)
+            appendMessageActions(assistantMsgId);
+            
+            loadChatSessions();
+            return;
+          }
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n\n');
+          
+          lines.forEach(line => {
+            if (line.trim().startsWith('data: ')) {
+              const dataStr = line.trim().slice(6);
+              if (dataStr === '[DONE]') {
+                return;
+              }
+              
+              try {
+                const dataJson = JSON.parse(dataStr);
+                
+                // Active session ID binding
+                if (dataJson.session_id) {
+                  currentSessionId = dataJson.session_id;
+                  currentSessionTitle = dataJson.session_title;
+                } else if (dataJson.choices) {
+                  const token = dataJson.choices[0].delta.content || "";
+                  responseBuffer += token;
+                  
+                  // Hide typing dots
+                  if (statusText && statusText.style.display !== 'none') {
+                    statusText.style.display = 'none';
+                  }
+                  
+                  // Render stream markdown buffer
+                  bodyContent.innerHTML = renderMarkdown(responseBuffer);
+                  scrollToBottom();
+                } else if (dataJson.error) {
+                  bodyContent.innerHTML = `<span style="color:var(--danger)">Error: ${dataJson.error}</span>`;
+                  if (statusText) statusText.remove();
+                }
+              } catch(e) {
+                // Not standard JSON or partial stream parsing error, fallback
+              }
+            }
+          });
+          readChunk();
+        });
+      }
+      readChunk();
+    })
+    .catch(err => {
+      isGenerating = false;
+      document.getElementById('sendBtn').disabled = false;
+      if (statusText) statusText.remove();
+      bodyContent.innerHTML = `<span style="color:var(--danger)">Connection failed: ${err.message}</span>`;
+    });
+  }
+
+  function appendMessageUI(role, text) {
+    const viewport = document.getElementById('chatMessagesViewport');
+    const wrapper = document.createElement('div');
+    wrapper.className = `message-wrapper ${role}`;
+    
+    const initial = role === 'user' ? '{{ user_name[0].upper() if user_name else "U" }}' : 'AI';
+    
+    wrapper.innerHTML = `
+      <div class="message-avatar">${initial}</div>
+      <div class="message-body">
+        <div class="msg-content-text">${renderMarkdown(text)}</div>
+        <div class="message-actions">
+          <button class="msg-btn" onclick="copyMessageText(this)"><i class="fas fa-copy"></i> Copy</button>
+          <button class="msg-btn" onclick="regenerateFromMessage(this)"><i class="fas fa-sync-alt"></i> Regenerate</button>
+        </div>
+      </div>
+    `;
+    viewport.appendChild(wrapper);
+  }
+
+  function appendAssistantPlaceholderUI(id) {
+    const viewport = document.getElementById('chatMessagesViewport');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-wrapper assistant';
+    wrapper.id = id;
+    
+    wrapper.innerHTML = `
+      <div class="message-avatar">AI</div>
+      <div class="message-body">
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+        <div class="msg-content-text"></div>
+      </div>
+    `;
+    viewport.appendChild(wrapper);
+  }
+
+  function appendMessageActions(wrapperId) {
+    const body = document.querySelector(`#${wrapperId} .message-body`);
+    if (body) {
+      const actions = document.createElement('div');
+      actions.className = 'message-actions';
+      actions.innerHTML = `
+        <button class="msg-btn" onclick="copyMessageText(this)"><i class="fas fa-copy"></i> Copy</button>
+        <button class="msg-btn" onclick="regenerateFromMessage(this)"><i class="fas fa-sync-alt"></i> Regenerate</button>
+      `;
+      body.appendChild(actions);
+    }
+  }
+
+  function copyMessageText(btn) {
+    const text = btn.closest('.message-body').querySelector('.msg-content-text').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      showNotification('Response copied to clipboard.', 'success');
+    });
+  }
+
+  function regenerateFromMessage(btn) {
+    if (isGenerating) return;
+    
+    // Find the user message before this assistant message
+    const wrappers = Array.from(document.querySelectorAll('.message-wrapper'));
+    const assistantIndex = wrappers.indexOf(btn.closest('.message-wrapper'));
+    
+    // Find previous user message
+    let userMsgText = "";
+    for (let i = assistantIndex - 1; i >= 0; i--) {
+      if (wrappers[i].classList.contains('user')) {
+        userMsgText = wrappers[i].querySelector('.msg-content-text').textContent;
+        break;
+      }
+    }
+    
+    if (userMsgText) {
+      document.getElementById('chatMessageInput').value = userMsgText;
+      submitChatMessage();
+    }
+  }
+
+  function scrollToBottom() {
+    const viewport = document.getElementById('chatMessagesViewport');
+    viewport.scrollTop = viewport.scrollHeight;
+  }
+
+  function escapeQuote(str) {
+    return str.replace(/'/g, "\\'");
+  }
 </script>
 {% endblock %}

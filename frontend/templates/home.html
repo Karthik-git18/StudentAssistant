@@ -1,160 +1,246 @@
 {% extends 'base.html' %}
+{% block section_title %}Dashboard Overview{% endblock %}
+
 {% block content %}
-<div class="page-title">Dashboard</div>
+<div class="page-header" style="margin-bottom: 24px;">
+  <div>
+    <h1 class="page-title">Welcome back, {{ user.name }}!</h1>
+    <p style="color: var(--text-muted); font-size: 14px;">Here is your academic and AI productivity breakdown.</p>
+  </div>
+  <div>
+    <span style="font-size: 13px; color: var(--text-muted);">
+      <i class="fas fa-clock" style="margin-right: 6px;"></i> Last Login: <strong>{{ user.last_login or 'N/A' }}</strong>
+    </span>
+  </div>
+</div>
 
-<div class="split-layout">
-  <div style="flex: 1;">
-    <div class="grid grid-4">
-      <div class="card stat-card">
-        <div class="stat-card-content">
-          <div class="stat-info">
-            <div class="stat-label">Uploaded PDFs</div>
-            <div class="stat-value">{{ stats['uploads'] or 0 }}</div>
-          </div>
-          <div class="stat-icon"><i class="fas fa-file-pdf"></i></div>
-        </div>
+<!-- Welcome Card & Stats Grid -->
+<div class="grid grid-4" style="margin-bottom: 28px;">
+  <!-- Welcome Widget -->
+  <div class="card welcome-card" style="grid-column: span 2; display: flex; flex-direction: column; justify-content: center; padding: 24px;">
+    <h2>Accelerate Your Engineering Studies</h2>
+    <p>Upload lecture notes, interact with your study material, run Viva mock exams, and build ATS-optimized resumes with the help of advanced generative AI models.</p>
+  </div>
+  
+  <!-- Stat Cards -->
+  <div class="card stat-card">
+    <div class="stat-card-content">
+      <div class="stat-info">
+        <span class="stat-label">PDFs Index Registry</span>
+        <span class="stat-value">{{ stats.uploads or 0 }}</span>
       </div>
-
-      <div class="card stat-card">
-        <div class="stat-card-content">
-          <div class="stat-info">
-            <div class="stat-label">Questions Asked</div>
-            <div class="stat-value">{{ stats['questions'] or 0 }}</div>
-          </div>
-          <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
-        </div>
-      </div>
-
-      <div class="card stat-card">
-        <div class="stat-card-content">
-          <div class="stat-info">
-            <div class="stat-label">Study Plans</div>
-            <div class="stat-value">{{ stats['plans'] or 0 }}</div>
-          </div>
-          <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
-        </div>
-      </div>
-
-      <div class="card stat-card">
-        <div class="stat-card-content">
-          <div class="stat-info">
-            <div class="stat-label">Last Login</div>
-            <div class="stat-value" style="font-size: 16px;">{{ last_login or 'N/A' }}</div>
-          </div>
-          <div class="stat-icon"><i class="fas fa-clock"></i></div>
-        </div>
-      </div>
+      <div class="stat-icon"><i class="fas fa-file-pdf"></i></div>
     </div>
+  </div>
 
-    <div class="card" style="margin-top: 24px;">
+  <div class="card stat-card">
+    <div class="stat-card-content">
+      <div class="stat-info">
+        <span class="stat-label">Questions Asked</span>
+        <span class="stat-value">{{ stats.questions or 0 }}</span>
+      </div>
+      <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-4" style="margin-bottom: 28px;">
+  <div class="card stat-card">
+    <div class="stat-card-content">
+      <div class="stat-info">
+        <span class="stat-label">Total AI Requests</span>
+        <span class="stat-value">{{ stats.ai_requests or 0 }}</span>
+      </div>
+      <div class="stat-icon"><i class="fas fa-robot"></i></div>
+    </div>
+  </div>
+
+  <div class="card stat-card">
+    <div class="stat-card-content">
+      <div class="stat-info">
+        <span class="stat-label">Resumes Created</span>
+        <span class="stat-value">{{ stats.resumes or 0 }}</span>
+      </div>
+      <div class="stat-icon"><i class="fas fa-file-invoice-alt"></i></div>
+    </div>
+  </div>
+
+  <div class="card stat-card" style="grid-column: span 2;">
+    <div class="stat-card-content">
+      <div class="stat-info">
+        <span class="stat-label">Study Sessions Activity</span>
+        <span class="stat-value">{{ study_sessions or 0 }}</span>
+      </div>
+      <div class="stat-icon"><i class="fas fa-history"></i></div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Split Layout -->
+<div class="split-layout">
+  <div class="split-main">
+    <!-- Chart Card -->
+    <div class="card" style="margin-bottom: 24px;">
       <div class="card-header">
         <div>
-          <h3>Weekly Activity</h3>
-          <p class="text-muted">Track your upload and study progress over the week.</p>
+          <h3 class="card-title">Productivity Visualizer</h3>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Track document uploads and AI study actions.</p>
         </div>
       </div>
-      <canvas id="activityChart" style="max-height: 320px;"></canvas>
+      <div style="position: relative; height: 260px;">
+        <canvas id="activityChart"></canvas>
+      </div>
     </div>
 
-    <div class="card" style="margin-top: 24px;">
-      <h3 style="margin-bottom: 16px;">Recent Activity</h3>
-      <div class="recent-list">
+    <!-- Timeline Activity Log -->
+    <div class="card">
+      <h3 class="card-title" style="margin-bottom: 16px;">Chronological Timeline</h3>
+      <div class="timeline">
         {% if recent_uploads or recent_chats %}
           {% for upload in recent_uploads %}
-            <div class="recent-item">
-              <div><strong>Uploaded:</strong> {{ upload.filename }}</div>
-              <div class="recent-meta">{{ upload.created_at }} • {{ upload.pages }} pages</div>
+            <div class="timeline-item">
+              <div class="timeline-dot" style="border-color: var(--accent-primary);"></div>
+              <div class="timeline-content">
+                <span class="timeline-title">Uploaded document: <strong>{{ upload.filename }}</strong></span>
+                <span class="timeline-time">{{ upload.created_at }} • {{ upload.pages }} pages</span>
+              </div>
             </div>
           {% endfor %}
           {% for chat in recent_chats %}
-            <div class="recent-item">
-              <div><strong>QA:</strong> {{ chat.message[:60] }}{% if chat.message|length > 60 %}...{% endif %}</div>
-              <div class="recent-meta">{{ chat.created_at }}</div>
+            <div class="timeline-item">
+              <div class="timeline-dot" style="border-color: var(--success);"></div>
+              <div class="timeline-content">
+                <span class="timeline-title">Asked AI: <em>"{{ chat.message[:60] }}{% if chat.message|length > 60 %}...{% endif %}"</em></span>
+                <span class="timeline-time">{{ chat.created_at }}</span>
+              </div>
             </div>
           {% endfor %}
         {% else %}
-          <div style="padding: 20px; text-align: center; color: var(--muted);">
-            <i class="fas fa-inbox" style="font-size: 24px; margin-bottom: 8px; display: block;"></i>
-            No recent activity yet
+          <div class="empty-state">
+            <i class="fas fa-stream"></i>
+            <h3>No recent activity logs</h3>
+            <p>Your recent activities will list here chronologically.</p>
           </div>
         {% endif %}
       </div>
     </div>
   </div>
 
-  <div style="width: min(360px, 100%);">
-    <div class="card sticky-card">
-      <h3>Quick Actions</h3>
+  <!-- Sidebar Widget Layout -->
+  <div class="split-sidebar">
+    <div class="card">
+      <h3 class="card-title" style="margin-bottom: 16px;">Quick Actions</h3>
       <div class="quick-actions">
         <a href="/learning" class="action-card">
-          <i class="fas fa-cloud-upload-alt"></i>
+          <i class="fas fa-upload"></i>
           <div>
             <h4>Upload PDF</h4>
-            <p>Index new documents instantly.</p>
+            <p>Index documents to ask questions.</p>
           </div>
         </a>
         <a href="/chat" class="action-card">
-          <i class="fas fa-robot"></i>
+          <i class="fas fa-comment-dots"></i>
           <div>
-            <h4>AI Chat</h4>
-            <p>Start a new conversation.</p>
+            <h4>Open AI Chat</h4>
+            <p>Launch a conversational session.</p>
           </div>
         </a>
-        <a href="/planner" class="action-card">
-          <i class="fas fa-calendar-plus"></i>
+        <a href="/resume" class="action-card">
+          <i class="fas fa-file-signature"></i>
           <div>
-            <h4>Study Planner</h4>
-            <p>Build a smart study schedule.</p>
+            <h4>Build Resume</h4>
+            <p>ATS optimized editor builder.</p>
           </div>
         </a>
+        {% if last_doc or recent_chats %}
+          <a href="{% if last_doc %}/learning{% else %}/chat{% endif %}" class="action-card" style="border-color: var(--success-light);">
+            <i class="fas fa-history" style="color: var(--success); background-color: var(--success-light);"></i>
+            <div>
+              <h4>Continue Last Session</h4>
+              <p>Pick up where you left off.</p>
+            </div>
+          </a>
+        {% endif %}
       </div>
+    </div>
+
+    <!-- Recent Resume Overview -->
+    <div class="card">
+      <h3 class="card-title" style="margin-bottom: 12px;">Recent Resume</h3>
+      {% if recent_resume %}
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background-color: var(--bg-secondary); border-radius: 8px;">
+          <div>
+            <span style="font-size: 13px; font-weight: 600; color: var(--text-primary); display: block;">Resume (ATS: {{ recent_resume.ats_score }}%)</span>
+            <span style="font-size: 11px; color: var(--text-muted);">Updated: {{ recent_resume.updated_at[:16] }}</span>
+          </div>
+          <a href="/resume" class="btn btn-secondary btn-icon" title="Open Builder"><i class="fas fa-chevron-right"></i></a>
+        </div>
+      {% else %}
+        <div style="text-align: center; padding: 12px; color: var(--text-muted); font-size: 13px;">
+          No generated resumes yet.
+        </div>
+      {% endif %}
     </div>
   </div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-  const ctx = document.getElementById('activityChart');
-  if (ctx) {
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        datasets: [
-          {
-            label: 'PDF Uploads',
-            data: [3, 2, 1, 0, 1, 0, 0],
-            borderColor: 'rgba(79, 70, 229, 0.95)',
-            backgroundColor: 'rgba(79, 70, 229, 0.15)',
-            tension: 0.35,
-            fill: true,
-            pointRadius: 4,
-          },
-          {
-            label: 'Study Plans',
-            data: [0, 0, 1, 0, 1, 0, 0],
-            borderColor: 'rgba(16, 185, 129, 0.95)',
-            backgroundColor: 'rgba(16, 185, 129, 0.15)',
-            tension: 0.35,
-            fill: true,
-            pointRadius: 4,
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'bottom' },
-          tooltip: { mode: 'index', intersect: false }
-        },
-        scales: {
-          x: { grid: { display: false } },
-          y: { beginAtZero: true, grid: { color: 'rgba(15, 23, 42, 0.08)' } }
-        }
-      }
-    });
-  }
-</script>
 {% endblock %}
 
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const ctx = document.getElementById('activityChart');
+    if (ctx) {
+      const isDark = document.documentElement.classList.contains('dark-mode');
+      const textColor = isDark ? '#94A3B8' : '#64748B';
+      const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+      
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          datasets: [
+            {
+              label: 'PDF Uploads',
+              data: [{{ stats.uploads or 0 }}, 0, 0, 0, 0, 0, 0],
+              borderColor: '#6366F1',
+              backgroundColor: 'rgba(99, 102, 241, 0.08)',
+              borderWidth: 2,
+              tension: 0.4,
+              fill: true,
+            },
+            {
+              label: 'AI Interrogations',
+              data: [{{ stats.questions or 0 }}, 0, 0, 0, 0, 0, 0],
+              borderColor: '#10B981',
+              backgroundColor: 'rgba(16, 185, 129, 0.08)',
+              borderWidth: 2,
+              tension: 0.4,
+              fill: true,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: textColor, font: { family: 'Inter' } }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: textColor }
+            },
+            y: {
+              grid: { color: gridColor },
+              ticks: { color: textColor, stepSize: 1 }
+            }
+          }
+        }
+      });
+    }
+  });
+</script>
+{% endblock %}
